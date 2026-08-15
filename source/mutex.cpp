@@ -1,56 +1,64 @@
 #include "coreinit/mutex.h"
+#include "internal/mutex_internal.hpp"
 #include "internal/handle_table.hpp"
 
 #include <switch.h>
 
 namespace {
+coreinit_nx::HandleTable<coreinit_nx::HostMutex> g_mutexes;
+}
 
-// I mutex di Cafe OS sono RICORSIVI: lo stesso thread puo' acquisirli
-// piu' volte senza bloccarsi, e deve rilasciarli altrettante volte.
-//
-// libnx Mutex NON e' ricorsivo. RMutex si'. Usare RMutex.
-//
-// Sbagliare qui non esplode subito: torna indietro come deadlock
-// intermittenti settimane dopo, quando il gioco entra in un percorso
-// di codice che riacquisisce lo stesso lock.
-struct HostMutex {
-    RMutex handle;
-    void init() { rmutexInit(&handle); }
-};
-
-coreinit_nx::HandleTable<HostMutex> g_mutexes;
-
-} // namespace
+namespace coreinit_nx {
+HostMutex *getHostMutex(const OSMutex *mutex) { return g_mutexes.get(mutex); }
+}
 
 extern "C" {
 
 void OSInitMutex(OSMutex *mutex)
 {
-    g_mutexes.get(mutex);
+    coreinit_nx::getHostMutex(mutex);
 }
 
 void OSInitMutexEx(OSMutex *mutex, const char *name)
 {
-    // Il nome serve solo al debugger su hardware reale: lo ignoriamo.
     (void)name;
-    g_mutexes.get(mutex);
+    coreinit_nx::getHostMutex(mutex);
 }
 
 void OSLockMutex(OSMutex *mutex)
 {
-    rmutexLock(&g_mutexes.get(mutex)->handle);
+    auto *h = coreinit_nx::getHostMutex(mutex);
+    if (mutexIsLockedByCurrentThread(&h->lock)) {
+        h->count++;          // rientro: non tocchiamo il kernel
+        return;
+    }
+    mutexLock(&h->lock);
+    h->count = 1;
 }
 
 void OSUnlockMutex(OSMutex *mutex)
 {
-    rmutexUnlock(&g_mutexes.get(mutex)->handle);
+    auto *h = coreinit_nx::getHostMutex(mutex);
+    if (!mutexIsLockedByCurrentThread(&h->lock)) {
+        return;              // difensivo: unlock non bilanciato
+    }
+    if (--h->count == 0) {
+        mutexUnlock(&h->lock);
+    }
 }
 
 int32_t OSTryLockMutex(OSMutex *mutex)
 {
-    // Cafe OS restituisce 1 se acquisito, 0 altrimenti.
-    // VERIFICARE in decaf-emu: libdecaf/src/cafe/libraries/coreinit/
-    return rmutexTryLock(&g_mutexes.get(mutex)->handle) ? 1 : 0;
+    auto *h = coreinit_nx::getHostMutex(mutex);
+    if (mutexIsLockedByCurrentThread(&h->lock)) {
+        h->count++;
+        return 1;
+    }
+    if (mutexTryLock(&h->lock)) {
+        h->count = 1;
+        return 1;
+    }
+    return 0;
 }
 
 } // extern "C"
