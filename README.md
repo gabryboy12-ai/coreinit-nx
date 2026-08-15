@@ -93,6 +93,36 @@ equivalent to `notify_all`.
 can wait on a condition, be woken by another thread, and resume with its
 recursion depth intact. Verified by a third thread attempting to acquire
 the mutex after a single unlock — it must fail.
+
+### `coreinit/thread.h`
+
+`OSCreateThread`, `OSResumeThread`, `OSSuspendThread`, `OSJoinThread`,
+`OSExitThread`
+
+`OSThread` size: `0x6a0` bytes.
+
+**Verified on hardware:** `OSCreateThread` creates a thread *suspended*, as
+Cafe OS does — it does not run until `OSResumeThread`. Argument passing and
+the exit value survive the entry point trampoline.
+
+Mapping decisions, all arbitrary and open to revision:
+
+- **Stack.** The guest-supplied stack pointer is stored but unused; libnx
+  allocates the host stack, sized from the guest's `stackSize` request.
+  Recompiled code will need the guest stack as its emulated PPC stack, but
+  how that separates from the ARM64 host stack depends on how the
+  recompiler emits code — unknown at time of writing.
+- **Priority.** Cafe OS 0–31 (lower is higher) is mapped linearly onto the
+  window between the process priority and `0x3F`. Relative ordering is
+  preserved, absolute values are not.
+- **Affinity.** Cafe OS affinity is a bitmask over 3 cores; libnx wants a
+  single core id. First set bit wins, `-2` for "any", and a failed create
+  retries on `-2` rather than giving up.
+- **Entry point.** Cafe OS uses `int(int, const char**)`, libnx uses
+  `void(void*)`. A trampoline bridges them and captures the return value.
+
+**Not implemented:** suspending an already-running thread. `OSSuspendThread`
+maintains the counter but does not stop execution.
 ---
 ## Design notes
 
