@@ -79,13 +79,59 @@ code path that reacquires a lock it already holds.
 
 `OSMutex` size: `0x2c` bytes.
 
----
+### `coreinit/condition.h`
 
+`OSInitCond`, `OSInitCondEx`, `OSWaitCond`, `OSSignalCond`
+
+`OSSignalCond` is a **broadcast**, mapped to `condvarWakeAll`. This is not
+an assumption: wut documents it as "will wake up any threads waiting",
+equivalent to `notify_all`.
+
+`OSCondition` size: `0x1c` bytes.
+
+**Verified on hardware:** a thread holding the mutex at recursion depth 2
+can wait on a condition, be woken by another thread, and resume with its
+recursion depth intact. Verified by a third thread attempting to acquire
+the mutex after a single unlock — it must fail.
+---
+## Design notes
+
+### Mutexes do not use libnx `RMutex`
+
+The obvious mapping for a recursive mutex is `RMutex`, and it works in
+isolation. It breaks as soon as condition variables arrive: `condvarWait`
+takes a plain `Mutex`, and it releases it exactly once — while an
+`RMutex`'s recursion counter would remain untouched, leaving inconsistent
+state.
+
+Instead, `HostMutex` locks a plain `Mutex` **exactly once** regardless of
+recursion depth, tracking the depth itself. `OSWaitCond` then saves the
+depth, lets `condvarWait` perform its single release and reacquire, and
+restores it.
+
+`mutexIsLockedByCurrentThread` makes ownership tracking possible without
+handling thread tags manually.
+
+### Known limitation: structure tags are not written
+
+`OSCondition` carries a `tag` field expected to hold `OS_CONDITION_TAG`
+(`0x634E6456`). Since guest structures are treated as opaque keys, this
+field is never written. Game code calling into `coreinit` will not notice,
+but code that validates tags — as debug builds do — would.
+
+### Creating threads on Horizon
+
+Thread priority must be queried with `svcGetThreadPriority` rather than
+hardcoded: a thread cannot be created with better priority than the
+process, and the value depends on how the homebrew was launched. Use
+`cpuid = -2` for the process default core.
+
+---
 ## Not implemented yet
 
 In rough dependency order:
 
-- [ ] Condition variables — `OSInitCond`, `OSWaitCond`, `OSSignalCond`
+- [x] Condition variables — `OSInitCond`, `OSWaitCond`, `OSSignalCond`
 - [ ] Threads — `OSCreateThread`, `OSJoinThread`, `OSExitThread`.
       Core affinity needs a decision: the Wii U has 3 cores, Horizon
       exposes a different number and reserves one.
