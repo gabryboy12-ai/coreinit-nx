@@ -193,10 +193,10 @@ process, and the value depends on how the homebrew was launched. Use
 In rough dependency order:
 
 - [x] Condition variables — `OSInitCond`, `OSWaitCond`, `OSSignalCond`
-- [ ] Threads — `OSCreateThread`, `OSJoinThread`, `OSExitThread`.
+- [x] Threads — `OSCreateThread`, `OSJoinThread`, `OSExitThread`.
       Core affinity needs a decision: the Wii U has 3 cores, Horizon
       exposes a different number and reserves one.
-- [ ] Time — `OSGetTime`, `OSGetSystemTime`, `OSTicksToCalendarTime`
+- [x] Time — `OSGetTime`, `OSGetSystemTime`, `OSTicksToCalendarTime`
 - [ ] Heaps — `MEMCreateExpHeap`, `MEMAllocFromExpHeap`. Endianness
       returns here: games inspect heap structures directly.
 - [ ] Filesystem — `FSOpenFile`, `FSReadFile`
