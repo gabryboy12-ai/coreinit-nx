@@ -123,6 +123,37 @@ Mapping decisions, all arbitrary and open to revision:
 
 **Not implemented:** suspending an already-running thread. `OSSuspendThread`
 maintains the counter but does not stop execution.
+
+### `coreinit/time.h`, `coreinit/systeminfo.h`
+
+`OSGetTime`, `OSGetSystemTime`, `OSGetTick`, `OSGetSystemTick`,
+`OSCalendarTimeToTicks`, `OSTicksToCalendarTime`,
+`__OSSetAbsoluteSystemTime`, `OSGetSystemInfo`
+
+`OSCalendarTime` size `0x28`, `OSSystemInfo` size `0x20`.
+
+Horizon counts at 19.2 MHz, the Wii U timer at `busClockSpeed / 4`. The
+ratio reduces exactly to **3315/1024** — integer conversion, no floating
+point, no overflow before roughly nine years of uptime.
+
+Calendar conversion uses the days-from-civil algorithm rather than
+`gmtime`/`mktime`, to avoid dragging in timezone handling and libc global
+state. Note that `OSCalendarTime::tm_year` is the **full AD year**, not
+`year - 1900` as in C's `struct tm`.
+
+**Verified on hardware:** the clock is monotonic and advances at the
+intended rate; calendar conversion round-trips correctly across leap years,
+weekdays and day-of-year.
+
+**Assumed, NOT verified:** the Cafe OS epoch (2000-01-01) and the bus clock
+constant (248.625 MHz). Both are internally consistent with the tests, which
+means the tests would keep passing even if the constants were wrong. Anyone
+able to confirm these against decaf-emu or real hardware is very welcome to.
+
+`OSSystemInfo` is the first structure whose **contents** matter, not just
+its size: the `OSTimerClockSpeed` macro expands into game code as
+`OSGetSystemInfo()->busClockSpeed / 4`. When recompiled code arrives, this
+is where endianness will first bite.
 ---
 ## Design notes
 
