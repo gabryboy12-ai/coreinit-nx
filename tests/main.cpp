@@ -1,6 +1,8 @@
 #include "coreinit/mutex.h"
 #include "coreinit/condition.h"
 #include "coreinit/thread.h"
+#include "coreinit/time.h"
+#include "coreinit/systeminfo.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -180,6 +182,65 @@ static void test_thread_lifecycle()
           "resume, esecuzione e valore di ritorno");
 }
 
+static uint64_t coreinit_nx_expected_half_second()
+{
+    return (uint64_t)(OSGetSystemInfo()->busClockSpeed / 4) / 2;
+}
+
+static void test_time_monotonic()
+{
+    const OSTime a = OSGetSystemTime();
+    svcSleepThread(10000000ULL);      // 10 ms
+    const OSTime b = OSGetSystemTime();
+    check(b > a, "il tempo di sistema avanza");
+}
+
+static void test_time_rate()
+{
+    const OSTime a = OSGetSystemTime();
+    svcSleepThread(500000000ULL);     // 500 ms
+    const OSTime elapsed = OSGetSystemTime() - a;
+
+    // Attesi ~31'078'125 tick. Tolleranza generosa: lo sleep non e' preciso.
+    const OSTime expected = (OSTime)coreinit_nx_expected_half_second();
+    const OSTime diff = elapsed > expected ? elapsed - expected
+                                           : expected - elapsed;
+    printf("  attesi %lld, misurati %lld\n", (long long)expected,
+                                             (long long)elapsed);
+    check(diff < expected / 20, "il tempo scorre alla frequenza del Wii U");
+}
+
+static void test_epoch()
+{
+    // 2000-01-01 00:00:00 e' l'epoca Cafe OS: deve valere 0 tick.
+    OSCalendarTime ct = {};
+    ct.tm_year = 2000; ct.tm_mon = 0; ct.tm_mday = 1;
+    check(OSCalendarTimeToTicks(&ct) == 0, "epoca 2000-01-01 = 0 tick");
+}
+
+static void test_calendar_roundtrip()
+{
+    // 29 febbraio 2024, un giovedi. Verifica anno bisestile,
+    // giorno della settimana e giorno dell'anno in un colpo solo.
+    OSCalendarTime in = {};
+    in.tm_year = 2024; in.tm_mon = 1; in.tm_mday = 29;
+    in.tm_hour = 13;   in.tm_min = 45; in.tm_sec = 30;
+
+    OSCalendarTime out = {};
+    OSTicksToCalendarTime(OSCalendarTimeToTicks(&in), &out);
+
+    const bool ok = out.tm_year == 2024 && out.tm_mon == 1 &&
+                    out.tm_mday == 29   && out.tm_hour == 13 &&
+                    out.tm_min == 45    && out.tm_sec == 30 &&
+                    out.tm_wday == 4    && out.tm_yday == 59;
+
+    printf("  %04ld-%02ld-%02ld wday=%ld yday=%ld\n",
+           (long)out.tm_year, (long)(out.tm_mon + 1), (long)out.tm_mday,
+           (long)out.tm_wday, (long)out.tm_yday);
+    check(ok, "roundtrip calendario su 2024-02-29");
+}
+
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -195,6 +256,10 @@ int main(int argc, char **argv)
     test_signal_wait();
     test_wait_restores_depth();
     test_thread_lifecycle();
+    test_time_monotonic();
+    test_time_rate();
+    test_epoch();
+    test_calendar_roundtrip();
 
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
