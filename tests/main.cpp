@@ -1,5 +1,6 @@
 #include "coreinit/mutex.h"
 #include "coreinit/condition.h"
+#include "coreinit/thread.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -142,6 +143,43 @@ static void test_wait_restores_depth()
           "profondita' ricorsione ripristinata dopo wait");
 }
 
+static volatile bool s_thread_ran;
+
+static int thread_entry(int argc, const char **argv)
+{
+    (void)argv;
+    s_thread_ran = true;
+    return argc + 100;
+}
+
+static void test_thread_lifecycle()
+{
+    static OSThread th;
+    static uint8_t  guest_stack[0x8000];
+
+    s_thread_ran = false;
+
+    if (!OSCreateThread(&th, thread_entry, 7, nullptr,
+                        guest_stack + sizeof(guest_stack), sizeof(guest_stack),
+                        16, OS_THREAD_ATTRIB_AFFINITY_ANY)) {
+        check(false, "OSCreateThread");
+        return;
+    }
+
+    // Cafe OS crea sospeso: dopo 50 ms non deve essere partito nulla.
+    svcSleepThread(50000000ULL);
+    const bool suspended = !s_thread_ran;
+
+    OSResumeThread(&th);
+
+    int result = -1;
+    const bool joined = OSJoinThread(&th, &result) == 1;
+
+    check(suspended, "thread creato sospeso");
+    check(joined && s_thread_ran && result == 107,
+          "resume, esecuzione e valore di ritorno");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -156,6 +194,8 @@ int main(int argc, char **argv)
     test_try_lock();
     test_signal_wait();
     test_wait_restores_depth();
+    test_thread_lifecycle();
+
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);
