@@ -203,7 +203,6 @@ crispy-doom-u,vpad,VPADGetTPCalibratedPoint,functions
 crispy-doom-u,vpad,VPADInit,functions
 crispy-doom-u,vpad,VPADRead,functions
 crispy-doom-u,vpad,VPADShutdown,functions
-flappy_bird_3d,coreinit,.fimport_coreinit,functions
 flappy_bird_3d,coreinit,DCFlushRange,functions
 flappy_bird_3d,coreinit,DCFlushRangeNoSync,functions
 flappy_bird_3d,coreinit,DCInvalidateRange,functions
@@ -514,7 +513,6 @@ flappy_bird_3d,coreinit,OSYieldThread,functions
 flappy_bird_3d,coreinit,_Exit,functions
 flappy_bird_3d,coreinit,__os_snprintf,functions
 flappy_bird_3d,coreinit,exit,functions
-flappy_bird_3d,gx2,.fimport_gx2,functions
 flappy_bird_3d,gx2,GX2BeginDisplayListEx,functions
 flappy_bird_3d,gx2,GX2CalcColorBufferAuxInfo,functions
 flappy_bird_3d,gx2,GX2CalcDRCSize,functions
@@ -714,7 +712,6 @@ flappy_bird_3d,gx2,GX2SwapScanBuffers,functions
 flappy_bird_3d,gx2,GX2WaitForFlip,functions
 flappy_bird_3d,gx2,GX2WaitForVsync,functions
 flappy_bird_3d,gx2,GX2WaitTimeStamp,functions
-flappy_bird_3d,nsysnet,.fimport_nsysnet,functions
 flappy_bird_3d,nsysnet,accept,functions
 flappy_bird_3d,nsysnet,bind,functions
 flappy_bird_3d,nsysnet,connect,functions
@@ -755,7 +752,6 @@ flappy_bird_3d,nsysnet,shutdown,functions
 flappy_bird_3d,nsysnet,socket,functions
 flappy_bird_3d,nsysnet,socket_lib_init,functions
 flappy_bird_3d,nsysnet,socketclose,functions
-flappy_bird_3d,proc_ui,.fimport_proc_ui,functions
 flappy_bird_3d,proc_ui,ProcUICalcMemorySize,functions
 flappy_bird_3d,proc_ui,ProcUIClearCallbacks,functions
 flappy_bird_3d,proc_ui,ProcUIDrawDoneRelease,functions
@@ -768,7 +764,6 @@ flappy_bird_3d,proc_ui,ProcUIProcessMessages,functions
 flappy_bird_3d,proc_ui,ProcUISetSaveCallback,functions
 flappy_bird_3d,proc_ui,ProcUIShutdown,functions
 flappy_bird_3d,proc_ui,ProcUISubProcessMessages,functions
-flappy_bird_3d,sndcore2,.fimport_sndcore2,functions
 flappy_bird_3d,sndcore2,AXAcquireVoice,functions
 flappy_bird_3d,sndcore2,AXAcquireVoiceEx,functions
 flappy_bird_3d,sndcore2,AXCheckVoiceOffsets,functions
@@ -827,7 +822,6 @@ flappy_bird_3d,sndcore2,AXSetVoiceState,functions
 flappy_bird_3d,sndcore2,AXSetVoiceType,functions
 flappy_bird_3d,sndcore2,AXSetVoiceVe,functions
 flappy_bird_3d,sndcore2,AXSetVoiceVeDelta,functions
-flappy_bird_3d,vpad,.fimport_vpad,functions
 flappy_bird_3d,vpad,VPADGetTPCalibratedPoint,functions
 flappy_bird_3d,vpad,VPADInit,functions
 flappy_bird_3d,vpad,VPADRead,functions

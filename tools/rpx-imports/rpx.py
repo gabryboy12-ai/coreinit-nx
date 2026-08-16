@@ -18,7 +18,9 @@ SHT_RPL_IMPORTS  = 0x80000002
 SHT_RPL_CRCS     = 0x80000003
 SHT_RPL_FILEINFO = 0x80000004
 SHF_RPL_ZLIB     = 0x08000000
+SHT_RELA        = 0x00000004
 
+RELA_ENTRY_SIZE = 12
 SYMTAB_ENTRY_SIZE = 16
 
 
@@ -71,9 +73,13 @@ class Rpx:
         end = self._shstr.find(b"\0", sh["name_off"])
         return self._shstr[sh["name_off"]:end].decode("utf-8", "replace")
 
-    def imports(self):
-        """{library: {"functions": [...], "data": [...]}}, sorted."""
-        # Which section indices are imports, and what they represent.
+    def imports(self, referenced_only=True):
+        """{library: {"functions": [...], "data": [...]}}
+
+        referenced_only=True keeps only symbols named by a relocation --
+        i.e. actually used. False returns every linked stub, which is an
+        upper bound and can be the library's entire export table.
+        """
         kinds = {}
         for sh in self.sections:
             if sh["type"] != SHT_RPL_IMPORTS:
@@ -87,6 +93,8 @@ class Rpx:
         if not kinds:
             return {}
 
+        refs = self.referenced_symbols() if referenced_only else None
+
         result = {}
         for sh in self.sections:
             if sh["type"] != SHT_SYMTAB:
@@ -94,16 +102,21 @@ class Rpx:
             symtab = self.data(sh)
             strtab = self.data(self.sections[sh["link"]])
 
-            for off in range(0, len(symtab) - SYMTAB_ENTRY_SIZE + 1,
-                             SYMTAB_ENTRY_SIZE):
-                (st_name, _value, _size, _info,
+            count = len(symtab) // SYMTAB_ENTRY_SIZE
+            for i in range(count):
+                off = i * SYMTAB_ENTRY_SIZE
+                (st_name, _value, _size, st_info,
                  _other, st_shndx) = struct.unpack(
                     ">IIIBBH", symtab[off:off + SYMTAB_ENTRY_SIZE])
                 if st_shndx not in kinds:
                     continue
+                if (st_info & 0xf) == 3:        # STT_SECTION: .fimport_* itself
+                    continue
+                if refs is not None and (sh["idx"], i) not in refs:
+                    continue
                 end = strtab.find(b"\0", st_name)
                 sym = strtab[st_name:end].decode("utf-8", "replace")
-                if not sym:
+                if not sym or sym.startswith("."):
                     continue
                 lib, kind = kinds[st_shndx]
                 result.setdefault(lib, {"functions": [], "data": []})
@@ -114,6 +127,24 @@ class Rpx:
                 result[lib][kind] = sorted(set(result[lib][kind]))
         return result
 
+    def referenced_symbols(self):
+        """(symtab_index, symbol_index) pairs named by any relocation.
+
+        Import sections list every stub the linker pulled in, not what the
+        code actually calls. Relocations are the ground truth: if nothing
+        relocates against a symbol, nothing calls it.
+        """
+        refs = set()
+        for sh in self.sections:
+            if sh["type"] != SHT_RELA:
+                continue
+            data = self.data(sh)
+            for off in range(0, len(data) - RELA_ENTRY_SIZE + 1,
+                             RELA_ENTRY_SIZE):
+                _r_offset, r_info, _r_addend = struct.unpack(
+                    ">III", data[off:off + RELA_ENTRY_SIZE])
+                refs.add((sh["link"], r_info >> 8))
+        return refs
 
 def load(path):
     with open(path, "rb") as f:

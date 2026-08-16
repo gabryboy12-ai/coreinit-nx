@@ -28,6 +28,50 @@ def find_rpx(root):
                 out.append(os.path.join(dirpath, f))
     return sorted(out)
 
+def group_titles(root):
+    """{title: [paths]}
+
+    A subdirectory of the corpus root is ONE title -- a game may ship its
+    code split across an .rpx stub plus several .rpl modules, and counting
+    each module as a separate title would wreck the frequency data.
+    A loose file directly in the root is a title on its own.
+    """
+    if os.path.isfile(root):
+        return {os.path.splitext(os.path.basename(root))[0]: [root]}
+
+    titles = {}
+    for entry in sorted(os.listdir(root)):
+        full = os.path.join(root, entry)
+        if os.path.isdir(full):
+            files = []
+            for dirpath, _dirs, names in os.walk(full):
+                for n in names:
+                    if n.lower().endswith((".rpx", ".rpl")):
+                        files.append(os.path.join(dirpath, n))
+            if files:
+                titles[entry] = sorted(files)
+        elif entry.lower().endswith((".rpx", ".rpl")):
+            titles[os.path.splitext(entry)[0]] = [full]
+    return titles
+
+
+def read_meta_xml(paths):
+    """Pick up the real title name and id from meta.xml, if present."""
+    import xml.etree.ElementTree as ET
+    dirs = {os.path.dirname(p) for p in paths}
+    dirs |= {os.path.dirname(d) for d in list(dirs)}
+    for d in dirs:
+        candidate = os.path.join(d, "meta.xml")
+        if not os.path.exists(candidate):
+            continue
+        try:
+            root = ET.parse(candidate).getroot()
+            name = (root.findtext("longname_en") or "").strip().replace("\n", " ")
+            tid = (root.findtext("title_id") or "").strip()
+            return (name or None, tid or None)
+        except Exception:
+            pass
+    return (None, None)
 
 def load_metadata(path):
     """Optional CSV: filename,title_id,name,publisher,year,genre,engine"""
@@ -68,36 +112,42 @@ def main():
     ap.add_argument("--top", type=int, default=25)
     args = ap.parse_args()
 
-    files = find_rpx(args.corpus)
-    if not files:
+    titles_map = group_titles(args.corpus)
+    if not titles_map:
         sys.exit(f"no .rpx/.rpl found under {args.corpus}")
 
     meta = load_metadata(args.metadata)
     implemented = load_implemented(args.implemented)
 
-    # (library, symbol, kind) -> set of titles
     users = collections.defaultdict(set)
     per_title = []
     failures = []
 
-    for path in files:
-        base = os.path.basename(path)
-        title = (meta.get(base, {}).get("name") or "").strip() \
-                or os.path.splitext(base)[0]
-        try:
-            imports = rpx.load(path).imports()
-        except Exception as exc:
-            failures.append((base, str(exc)))
-            continue
+    for title, paths in titles_map.items():
+        name, tid = read_meta_xml(paths)
+        display = name or meta.get(title, {}).get("name") or title
 
-        count = 0
-        for lib, entries in imports.items():
-            for kind in ("functions", "data"):
-                for sym in entries[kind]:
-                    users[(lib, sym, kind)].add(title)
-                    per_title.append((title, lib, sym, kind))
-                    count += 1
-        print(f"  {title:<40} {count:>5} imports")
+        # Union across all modules of one title: a symbol counts once per
+        # title, however many .rpl files reference it.
+        symbols = set()
+        for path in paths:
+            try:
+                imports = rpx.load(path).imports()
+            except Exception as exc:
+                failures.append((os.path.basename(path), str(exc)))
+                continue
+            for lib, entries in imports.items():
+                for kind in ("functions", "data"):
+                    for sym in entries[kind]:
+                        symbols.add((lib, sym, kind))
+
+        for key in symbols:
+            users[key].add(display)
+            per_title.append((display,) + key)
+
+        suffix = f"  [{tid}]" if tid else ""
+        print(f"  {display:<40} {len(symbols):>5} imports  "
+              f"({len(paths)} module/s){suffix}")
 
     titles = sorted({t for t, _, _, _ in per_title})
     n = len(titles)

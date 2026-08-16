@@ -233,7 +233,6 @@ proc_ui,ProcUIIsRunning,functions,2,50.0,no
 sndcore2,AXInit,functions,2,50.0,no
 sndcore2,AXVoiceBegin,functions,2,50.0,no
 sndcore2,AXVoiceEnd,functions,2,50.0,no
-coreinit,.fimport_coreinit,functions,1,25.0,no
 coreinit,DCFlushRangeNoSync,functions,1,25.0,no
 coreinit,DCInvalidateRange,functions,1,25.0,no
 coreinit,DCStoreRangeNoSync,functions,1,25.0,no
@@ -450,7 +449,6 @@ coreinit,OSWaitRendezvousWithTimeout,functions,1,25.0,no
 coreinit,OSWakeupThread,functions,1,25.0,no
 coreinit,OSXorAtomic64,functions,1,25.0,no
 coreinit,OSYieldThread,functions,1,25.0,no
-gx2,.fimport_gx2,functions,1,25.0,no
 gx2,GX2BeginDisplayListEx,functions,1,25.0,no
 gx2,GX2CalcColorBufferAuxInfo,functions,1,25.0,no
 gx2,GX2CalcDepthBufferHiZInfo,functions,1,25.0,no
@@ -587,7 +585,6 @@ gx2,GX2SetVertexTexture,functions,1,25.0,no
 gx2,GX2SetVertexUniformBlock,functions,1,25.0,no
 gx2,GX2SetViewportReg,functions,1,25.0,no
 gx2,GX2WaitForFlip,functions,1,25.0,no
-nsysnet,.fimport_nsysnet,functions,1,25.0,no
 nsysnet,accept,functions,1,25.0,no
 nsysnet,bind,functions,1,25.0,no
 nsysnet,connect,functions,1,25.0,no
@@ -630,13 +627,11 @@ nsysnet,socket_lib_init,functions,1,25.0,no
 nsysnet,socketclose,functions,1,25.0,no
 padscore,KPADShutdown,functions,1,25.0,no
 padscore,WPADEnableWiiRemote,functions,1,25.0,no
-proc_ui,.fimport_proc_ui,functions,1,25.0,no
 proc_ui,ProcUICalcMemorySize,functions,1,25.0,no
 proc_ui,ProcUIClearCallbacks,functions,1,25.0,no
 proc_ui,ProcUIInForeground,functions,1,25.0,no
 proc_ui,ProcUIInit,functions,1,25.0,no
 proc_ui,ProcUISetSaveCallback,functions,1,25.0,no
-sndcore2,.fimport_sndcore2,functions,1,25.0,no
 sndcore2,AXAcquireVoiceEx,functions,1,25.0,no
 sndcore2,AXCheckVoiceOffsets,functions,1,25.0,no
 sndcore2,AXDeregisterAppFrameCallback,functions,1,25.0,no
@@ -677,6 +672,5 @@ sndcore2,AXSetVoiceRmtIIRCoefs,functions,1,25.0,no
 sndcore2,AXSetVoiceSrc,functions,1,25.0,no
 sndcore2,AXSetVoiceVeDelta,functions,1,25.0,no
 sysapp,SYSLaunchMenu,functions,1,25.0,no
-vpad,.fimport_vpad,functions,1,25.0,no
 vpad,VPADEnableGyroAccRevise,functions,1,25.0,no
 vpad,VPADShutdown,functions,1,25.0,no
