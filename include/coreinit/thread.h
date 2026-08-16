@@ -14,6 +14,7 @@ typedef struct OSThread {
 
 typedef int (*OSThreadEntryPointFn)(int argc, const char **argv);
 typedef uint8_t OSThreadAttributes;
+typedef void (*OSThreadCleanupCallbackFn)(OSThread *thread, void *stack);
 
 enum {
     OS_THREAD_ATTRIB_AFFINITY_CPU0 = 1 << 0,
@@ -37,6 +38,11 @@ int32_t OSResumeThread(OSThread *thread);
 int32_t OSSuspendThread(OSThread *thread);
 int32_t OSJoinThread(OSThread *thread, int *threadResult);
 void    OSExitThread(int32_t result);
+OSThread *OSGetCurrentThread(void);
+uint32_t  OSGetCoreId(void); // TODO: spostare in coreinit/core.h
+
+OSThreadCleanupCallbackFn OSSetThreadCleanupCallback(
+        OSThread *thread, OSThreadCleanupCallbackFn callback);
 
 #ifdef __cplusplus
 }

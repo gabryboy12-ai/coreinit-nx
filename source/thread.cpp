@@ -10,24 +10,28 @@ constexpr size_t kMinHostStack = 0x10000;
 
 struct HostThread {
     ::Thread             handle;
+    OSThread            *guest;                // <-- nuovo
     OSThreadEntryPointFn entry;
     int32_t              argc;
     const char         **argv;
-    void                *guestStack;      // conservato, vedi note di design
+    void                *guestStack;
     uint32_t             guestStackSize;
     int32_t              exitResult;
     int32_t              suspendCount;
+    OSThreadCleanupCallbackFn cleanup;         // <-- nuovo
     bool                 created;
     bool                 started;
     bool                 detached;
 
     void init() {
-        entry = nullptr; argc = 0; argv = nullptr;
+        guest = nullptr; entry = nullptr; argc = 0; argv = nullptr;
         guestStack = nullptr; guestStackSize = 0;
-        exitResult = 0; suspendCount = 0;
+        exitResult = 0; suspendCount = 0; cleanup = nullptr;
         created = false; started = false; detached = false;
     }
 };
+
+OSThread g_mainThread;
 
 coreinit_nx::HandleTable<HostThread> g_threads;
 
@@ -40,6 +44,7 @@ void trampoline(void *arg)
     auto *h = static_cast<HostThread *>(arg);
     t_current = h;
     h->exitResult = h->entry(h->argc, h->argv);
+    if (h->cleanup) h->cleanup(h->guest, h->guestStack);
 }
 
 // Cafe OS: 0-31, piu' basso = piu' prioritario.
@@ -92,6 +97,8 @@ int32_t OSCreateThread(OSThread *thread, OSThreadEntryPointFn entry,
     h->suspendCount   = 1;        // Cafe OS crea SOSPESO
     h->started        = false;
     h->detached       = (attributes & OS_THREAD_ATTRIB_DETACHED) != 0;
+    h->guest          = thread;
+    h->cleanup        = nullptr;
 
     const int32_t prio    = mapPriority(priority);
     const size_t  stackSz = hostStackSize(stackSize);
@@ -147,6 +154,41 @@ void OSExitThread(int32_t result)
 {
     if (t_current) t_current->exitResult = result;
     threadExit();
+}
+
+// Il thread principale non e' stato creato con OSCreateThread, quindi non
+// ha un OSThread del guest. Ne forniamo uno sintetico: il codice del gioco
+// usa il puntatore come identita' e per passarlo ad altre API, non ne
+// ispeziona il contenuto.
+
+OSThread *OSGetCurrentThread(void)
+{
+    if (t_current) return t_current->guest;
+
+    auto *h = g_threads.get(&g_mainThread);
+    if (!h->guest) {
+        h->guest   = &g_mainThread;
+        h->created = true;
+        h->started = true;
+    }
+    return &g_mainThread;
+}
+
+uint32_t OSGetCoreId(void)
+{
+    // Wii U: 3 core (0-2). Horizon ne espone 4 e ne riserva uno.
+    // Il core 3 non esiste su Cafe OS: lo riportiamo come 2.
+    const uint32_t id = svcGetCurrentProcessorNumber();
+    return id > 2 ? 2 : id;
+}
+
+OSThreadCleanupCallbackFn OSSetThreadCleanupCallback(
+        OSThread *thread, OSThreadCleanupCallbackFn callback)
+{
+    auto *h = g_threads.get(thread);
+    OSThreadCleanupCallbackFn previous = h->cleanup;
+    h->cleanup = callback;
+    return previous;
 }
 
 } // extern "C"

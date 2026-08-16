@@ -138,4 +138,12 @@ int32_t __OSSetAbsoluteSystemTime(OSTime time)
     return 1;
 }
 
+void OSSleepTicks(OSTime ticks)
+{
+    if (ticks <= 0) return;
+    // 1e9 / 62156250 riduce esattamente a 32000/1989.
+    // E' la stessa identita' usata dalla macro OSTicksToNanoseconds di wut.
+    svcSleepThread((u64)ticks * 32000ull / 1989ull);
+}
+
 } // extern "C"

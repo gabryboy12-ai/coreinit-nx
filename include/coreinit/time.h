@@ -29,6 +29,7 @@ OSTick  OSGetSystemTick(void);
 OSTime  OSCalendarTimeToTicks(OSCalendarTime *calendarTime);
 void    OSTicksToCalendarTime(OSTime time, OSCalendarTime *calendarTime);
 int32_t __OSSetAbsoluteSystemTime(OSTime time);
+void OSSleepTicks(OSTime ticks);
 
 #ifdef __cplusplus
 }

@@ -27,3 +27,11 @@ extern "C" OSSystemInfo *OSGetSystemInfo(void)
     mutexUnlock(&g_lock);
     return &g_info;
 }
+
+extern "C" uint64_t OSGetTitleID(void)
+{
+    // Non c'e' un vero title ID Wii U qui. I giochi lo usano per nominare
+    // i salvataggi e per il logging. Restituiamo 0: dovra' diventare
+    // configurabile, impostato dal port a runtime.
+    return 0;
+}

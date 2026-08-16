@@ -3,6 +3,7 @@
 #include "coreinit/thread.h"
 #include "coreinit/time.h"
 #include "coreinit/systeminfo.h"
+#include "coreinit/cache.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -240,6 +241,40 @@ static void test_calendar_roundtrip()
     check(ok, "roundtrip calendario su 2024-02-29");
 }
 
+static void test_sleep_ticks()
+{
+    const OSTime before = OSGetSystemTime();
+    OSSleepTicks(OSGetSystemInfo()->busClockSpeed / 4 / 10);   // ~100 ms
+    const OSTime elapsed = OSGetSystemTime() - before;
+    const OSTime expected = OSGetSystemInfo()->busClockSpeed / 4 / 10;
+
+    printf("  attesi ~%lld, misurati %lld\n",
+           (long long)expected, (long long)elapsed);
+    check(elapsed >= expected, "OSSleepTicks dorme almeno il richiesto");
+}
+
+static void test_core_id()
+{
+    const uint32_t id = OSGetCoreId();
+    printf("  core corrente: %lu\n", (unsigned long)id);
+    check(id <= 2, "OSGetCoreId resta nell'intervallo Cafe OS");
+}
+
+static void test_current_thread()
+{
+    OSThread *a = OSGetCurrentThread();
+    OSThread *b = OSGetCurrentThread();
+    check(a != nullptr && a == b, "OSGetCurrentThread e' stabile");
+}
+
+static void test_cache_ops()
+{
+    static uint8_t buffer[256];
+    for (unsigned i = 0; i < sizeof(buffer); i++) buffer[i] = (uint8_t)i;
+    DCStoreRange(buffer, sizeof(buffer));
+    DCFlushRange(buffer, sizeof(buffer));
+    check(buffer[42] == 42, "le operazioni di cache non corrompono i dati");
+}
 
 int main(int argc, char **argv)
 {
@@ -260,6 +295,10 @@ int main(int argc, char **argv)
     test_time_rate();
     test_epoch();
     test_calendar_roundtrip();
+    test_sleep_ticks();
+    test_core_id();
+    test_current_thread();
+    test_cache_ops();
 
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);

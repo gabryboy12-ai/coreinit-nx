@@ -33,3 +33,12 @@ __OSSetAbsoluteSystemTime
 
 # systeminfo.cpp
 OSGetSystemInfo
+
+# blocco A
+OSSleepTicks
+OSGetCoreId
+OSGetCurrentThread
+OSSetThreadCleanupCallback
+DCFlushRange
+DCStoreRange
+OSGetTitleID
