@@ -4,8 +4,9 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 [libnx](https://github.com/switchbrew/libnx), so that statically
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
-> **Status: early.** One module implemented and verified on hardware.
-> This is a foundation, not a finished runtime.
+> **Status: early.** Five modules implemented, 15 tests passing on real
+> hardware. Measured coverage: **14.2%** of coreinit requirements across a
+> 4-title homebrew corpus. This is a foundation, not a finished runtime.
 
 ---
 
@@ -52,6 +53,11 @@ the structure and may embed it inside its own structures. Sizes are taken
 from [wut](https://github.com/devkitPro/wut), the Wii U homebrew toolchain,
 which is the authoritative public source.
 
+`OSSystemInfo` is the first exception: its **contents** matter, not just its
+size, because the `OSTimerClockSpeed` macro expands into game code as
+`OSGetSystemInfo()->busClockSpeed / 4`. Heaps are expected to be the next
+place this approach strains, since games inspect heap structures directly.
+
 ### Lazy creation
 
 `HandleTable::get()` creates the host object on first use rather than
@@ -66,40 +72,31 @@ cleanly beats crashing.
 ### `coreinit/mutex.h`
 
 `OSInitMutex`, `OSInitMutexEx`, `OSLockMutex`, `OSUnlockMutex`,
-`OSTryLockMutex`
+`OSTryLockMutex` — `OSMutex` is `0x2c` bytes.
 
-**Verified on hardware:** Cafe OS mutexes are recursive — the same thread
-may acquire one repeatedly. libnx `Mutex` is *not* recursive; `RMutex` is.
-Mapping `OSMutex` onto `RMutex` was tested on a real console and behaves
-correctly, including the recursive acquire case.
-
-This is worth stating explicitly because getting it wrong does not fail
-loudly: it surfaces later as intermittent deadlocks when the game enters a
-code path that reacquires a lock it already holds.
-
-`OSMutex` size: `0x2c` bytes.
+**Verified on hardware:** Cafe OS mutexes are recursive; the same thread may
+acquire one repeatedly. Getting this wrong does not fail loudly — it
+surfaces later as intermittent deadlocks.
 
 ### `coreinit/condition.h`
 
-`OSInitCond`, `OSInitCondEx`, `OSWaitCond`, `OSSignalCond`
+`OSInitCond`, `OSInitCondEx`, `OSWaitCond`, `OSSignalCond` —
+`OSCondition` is `0x1c` bytes.
 
-`OSSignalCond` is a **broadcast**, mapped to `condvarWakeAll`. This is not
-an assumption: wut documents it as "will wake up any threads waiting",
-equivalent to `notify_all`.
-
-`OSCondition` size: `0x1c` bytes.
+`OSSignalCond` is a **broadcast**, mapped to `condvarWakeAll`. Not an
+assumption: wut documents it as equivalent to `notify_all`.
 
 **Verified on hardware:** a thread holding the mutex at recursion depth 2
 can wait on a condition, be woken by another thread, and resume with its
-recursion depth intact. Verified by a third thread attempting to acquire
-the mutex after a single unlock — it must fail.
+depth intact. Verified by a *third* thread attempting to acquire the mutex
+after a single unlock — it must fail. Testing this from the waiting thread
+would always succeed, since the mutex is recursive.
 
 ### `coreinit/thread.h`
 
 `OSCreateThread`, `OSResumeThread`, `OSSuspendThread`, `OSJoinThread`,
-`OSExitThread`
-
-`OSThread` size: `0x6a0` bytes.
+`OSExitThread`, `OSGetCurrentThread`, `OSGetCoreId`,
+`OSSetThreadCleanupCallback` — `OSThread` is `0x6a0` bytes.
 
 **Verified on hardware:** `OSCreateThread` creates a thread *suspended*, as
 Cafe OS does — it does not run until `OSResumeThread`. Argument passing and
@@ -111,35 +108,42 @@ Mapping decisions, all arbitrary and open to revision:
   allocates the host stack, sized from the guest's `stackSize` request.
   Recompiled code will need the guest stack as its emulated PPC stack, but
   how that separates from the ARM64 host stack depends on how the
-  recompiler emits code — unknown at time of writing.
+  recompiler emits code — unknown at time of writing. **Input welcome.**
 - **Priority.** Cafe OS 0–31 (lower is higher) is mapped linearly onto the
   window between the process priority and `0x3F`. Relative ordering is
   preserved, absolute values are not.
-- **Affinity.** Cafe OS affinity is a bitmask over 3 cores; libnx wants a
-  single core id. First set bit wins, `-2` for "any", and a failed create
-  retries on `-2` rather than giving up.
+- **Affinity.** Cafe OS affinity is a 3-core bitmask; libnx wants a single
+  core id. First set bit wins, `-2` for "any", and a failed create retries
+  on `-2` rather than giving up. `OSGetCoreId` clamps Horizon's core 3 to 2,
+  since it does not exist on Cafe OS.
 - **Entry point.** Cafe OS uses `int(int, const char**)`, libnx uses
   `void(void*)`. A trampoline bridges them and captures the return value.
+- **Main thread.** It was never created through `OSCreateThread`, so it has
+  no guest `OSThread`. A synthetic one is registered lazily on first
+  `OSGetCurrentThread` call. Game code uses the pointer as an identity, not
+  as a structure to inspect.
 
-**Not implemented:** suspending an already-running thread. `OSSuspendThread`
-maintains the counter but does not stop execution.
+**Not implemented:** suspending an already-running thread.
+`OSSuspendThread` maintains the counter but does not stop execution.
 
-### `coreinit/time.h`, `coreinit/systeminfo.h`
+### `coreinit/time.h`, `coreinit/systeminfo.h`, `coreinit/title.h`
 
 `OSGetTime`, `OSGetSystemTime`, `OSGetTick`, `OSGetSystemTick`,
-`OSCalendarTimeToTicks`, `OSTicksToCalendarTime`,
-`__OSSetAbsoluteSystemTime`, `OSGetSystemInfo`
-
-`OSCalendarTime` size `0x28`, `OSSystemInfo` size `0x20`.
+`OSSleepTicks`, `OSCalendarTimeToTicks`, `OSTicksToCalendarTime`,
+`__OSSetAbsoluteSystemTime`, `OSGetSystemInfo`, `OSGetTitleID` —
+`OSCalendarTime` is `0x28`, `OSSystemInfo` is `0x20`.
 
 Horizon counts at 19.2 MHz, the Wii U timer at `busClockSpeed / 4`. The
 ratio reduces exactly to **3315/1024** — integer conversion, no floating
-point, no overflow before roughly nine years of uptime.
+point, no overflow before roughly nine years of uptime. Tick-to-nanosecond
+conversion reduces exactly to **32000/1989**, matching wut's own macro.
 
 Calendar conversion uses the days-from-civil algorithm rather than
-`gmtime`/`mktime`, to avoid dragging in timezone handling and libc global
-state. Note that `OSCalendarTime::tm_year` is the **full AD year**, not
-`year - 1900` as in C's `struct tm`.
+`gmtime`/`mktime`, to avoid timezone handling and libc global state. Note
+that `OSCalendarTime::tm_year` is the **full AD year**, not `year - 1900`.
+
+`OSGetTitleID` returns 0. There is no real Wii U title ID here; it should
+become configurable, set by the port at runtime.
 
 **Verified on hardware:** the clock is monotonic and advances at the
 intended rate; calendar conversion round-trips correctly across leap years,
@@ -150,60 +154,108 @@ constant (248.625 MHz). Both are internally consistent with the tests, which
 means the tests would keep passing even if the constants were wrong. Anyone
 able to confirm these against decaf-emu or real hardware is very welcome to.
 
-`OSSystemInfo` is the first structure whose **contents** matter, not just
-its size: the `OSTimerClockSpeed` macro expands into game code as
-`OSGetSystemInfo()->busClockSpeed / 4`. When recompiled code arrives, this
-is where endianness will first bite.
----
-## Design notes
+### `coreinit/cache.h`
 
-### Mutexes do not use libnx `RMutex`
+`DCFlushRange`, `DCStoreRange` — mapped to `armDCacheFlush` and
+`armDCacheClean`.
 
-The obvious mapping for a recursive mutex is `RMutex`, and it works in
-isolation. It breaks as soon as condition variables arrive: `condvarWait`
-takes a plain `Mutex`, and it releases it exactly once — while an
-`RMutex`'s recursion counter would remain untouched, leaving inconsistent
-state.
-
-Instead, `HostMutex` locks a plain `Mutex` **exactly once** regardless of
-recursion depth, tracking the depth itself. `OSWaitCond` then saves the
-depth, lets `condvarWait` perform its single release and reacquire, and
-restores it.
-
-`mutexIsLockedByCurrentThread` makes ownership tracking possible without
-handling thread tags manually.
-
-### Known limitation: structure tags are not written
-
-`OSCondition` carries a `tag` field expected to hold `OS_CONDITION_TAG`
-(`0x634E6456`). Since guest structures are treated as opaque keys, this
-field is never written. Game code calling into `coreinit` will not notice,
-but code that validates tags — as debug builds do — would.
-
-### Creating threads on Horizon
-
-Thread priority must be queried with `svcGetThreadPriority` rather than
-hardcoded: a thread cannot be created with better priority than the
-process, and the value depends on how the homebrew was launched. Use
-`cpuid = -2` for the process default core.
+**NOT verified.** From userspace there is no way to observe the cache; the
+test only shows that the data is not corrupted. On the Wii U these matter
+because the GPU reads main memory directly and the CPU cache is not coherent
+with it. Under Horizon the situation differs, and for recompiled code these
+may end up closer to no-ops than to real cache operations.
 
 ---
+
+## The import census
+
+`tools/rpx-imports/` extracts the named imports from Wii U `.rpx` files and
+aggregates them across a corpus, so that implementation order follows
+measured demand rather than intuition.
+
+This is possible because RPX files carry **named import tables**: Cafe OS
+uses dynamic linking, so a title declares exactly which functions it needs
+from `coreinit`, `gx2`, `nsysnet` and the rest. No recompilation required —
+it is an ELF walk.
+
+```sh
+python3 tools/rpx-imports/extract_imports.py <file.rpx>
+python3 tools/rpx-imports/census.py <corpus-dir> --label homebrew
+```
+
+Frequency is counted as **number of titles importing a symbol**, not total
+call sites. A function every title needs matters more than one called a
+thousand times inside a single game. Coverage is weighted the same way,
+which is why implementing seven well-chosen functions moved it from 9.6% to
+14.2%.
+
+Current results are in `census/`.
+
+### Current corpus and its limits
+
+4 homebrew titles: 681 distinct imports across 8 libraries, 348 in
+`coreinit` alone.
+
+**This corpus measures homebrew, not games.** It over-represents
+`OSScreen`, since `WHBLogConsole` draws through it, and under-represents
+`GX2`, which is how commercial titles actually render. Treat the ranking as
+"the floor any Cafe OS binary needs", not as a picture of what games do.
+
+A commercial corpus is the obvious next step. Contributions of import lists
+from titles you own — the CSV output, never the binaries — are very welcome.
+
+Only derived data is published here: function names and counts. A list of
+imported symbol names is factual metadata, not game content.
+
+---
+
 ## Not implemented yet
 
-In rough dependency order:
+Ordered by measured frequency in the current corpus:
 
-- [x] Condition variables — `OSInitCond`, `OSWaitCond`, `OSSignalCond`
-- [x] Threads — `OSCreateThread`, `OSJoinThread`, `OSExitThread`.
-      Core affinity needs a decision: the Wii U has 3 cores, Horizon
-      exposes a different number and reserves one.
-- [x] Time — `OSGetTime`, `OSGetSystemTime`, `OSTicksToCalendarTime`
-- [ ] Heaps — `MEMCreateExpHeap`, `MEMAllocFromExpHeap`. Endianness
-      returns here: games inspect heap structures directly.
-- [ ] Filesystem — `FSOpenFile`, `FSReadFile`
-- [ ] Everything else
+- [ ] **Heaps** — `MEMAllocFromExpHeapEx`, `MEMFreeToExpHeap`,
+      `MEMCreateExpHeapEx`, `MEMAllocFromFrmHeapEx`,
+      `MEMRecordStateForFrmHeap`, `MEMFreeByStateToFrmHeap`,
+      `MEMGetBaseHeapHandle` and friends. Present in **100%** of the corpus.
+      Two distinct allocators: FrmHeap is a two-ended stack, ExpHeap is a
+      general-purpose allocator. This is the first module that requires
+      *implementing* rather than *mapping*: `MEMCreateExpHeapEx` receives a
+      region of guest memory and must suballocate it, because returned
+      pointers have to fall inside that region — games do arithmetic on them.
+- [ ] `OSSavesDone_ReadyToRelease` — 100%
+- [ ] Alarms — `OSCreateAlarm`, `OSCancelAlarm`, `OSGetAlarmUserData` — 75%
+- [ ] Thread-local storage — `OSGetThreadSpecific`, `OSSetThreadSpecific`
+- [ ] `OSFastMutex_*` — a second, distinct mutex family
+- [ ] Semaphores — `OSInitSemaphore`
+- [ ] Spinlocks — `OSUninterruptibleSpinLock_*`
+- [ ] Filesystem — the `FSA*` family, 25 functions
+- [ ] `OSFatal`, thread introspection (`OSGetThreadPriority`,
+      `OSGetThreadAffinity`)
 
-Graphics (`GX2`) is explicitly **out of scope** for this repository. It is a
-much larger problem and deserves its own project.
+Graphics (`GX2`) is explicitly **out of scope** for this repository. 202
+distinct imports already appear in a 4-title corpus. It deserves its own
+project.
+
+---
+
+## Open questions
+
+**libc symbol collision.** `coreinit` exports `exit`, `__os_snprintf` and
+presumably other names that newlib already defines. Implementing them here
+would collide at link time. This needs a project-wide linking strategy —
+symbol prefixing, `ld --wrap`, or a freestanding build — not a per-function
+workaround. `exit` appears in 100% of the corpus, so this blocks real
+coverage.
+
+**Function pointers imported as data.** `MEMAllocFromDefaultHeap`,
+`MEMAllocFromDefaultHeapEx` and `MEMFreeToDefaultHeap` appear as
+`.dimport_` entries, meaning games read a function *pointer* from
+`coreinit`'s data segment and call through it. That requires exporting
+global variables holding addresses, not function symbols — a mechanism this
+project does not yet have.
+
+**Guest stacks.** See the thread section above. This one needs someone who
+knows how the recompiler emits code.
 
 ---
 
@@ -216,8 +268,7 @@ make
 ```
 
 Produces `coreinit-nx.nro`. Copy it to `/switch/` on your SD card and run it
-from the Homebrew Menu. It executes the test suite and prints results to
-screen.
+from the Homebrew Menu. It runs the test suite and prints results to screen.
 
 ---
 
@@ -225,18 +276,22 @@ screen.
 
 Adding a function means, in order:
 
-1. **Read the semantics** in decaf-emu, under
+1. **Check the census** in `census/frequency.csv`. If it is not used by any
+   title in the corpus, it is probably not the best use of your time.
+2. **Read the semantics** in decaf-emu, under
    `libdecaf/src/cafe/libraries/coreinit/`. This is a full HLE
    implementation and serves as the specification. Do not guess.
-2. **Check the ABI size** in wut's headers
-   (`WUT_CHECK_SIZE(TypeName, ...)`).
-3. **Map it onto libnx.** Prefer libnx kernel primitives over C++ standard
+3. **Check the ABI size** in wut's headers
+   (`WUT_CHECK_SIZE(TypeName, ...)`), and mirror wut's declarations
+   literally, even where types are equivalent.
+4. **Map it onto libnx.** Prefer libnx kernel primitives over C++ standard
    library equivalents — the toolchain builds with `-fno-exceptions`, and
    depending on the standard library's threading support adds a failure
-   mode that has nothing to do with this project.
-4. **Write a test** that runs on device. Prefer tests where a wrong
+   mode unrelated to this project.
+5. **Write a test** that runs on device. Prefer tests where a wrong
    implementation hangs or fails visibly rather than passing silently.
-5. **Open a pull request**, stating what you verified on hardware and what
+6. **Update `tools/rpx-imports/implemented.txt`** so coverage stays honest.
+7. **Open a pull request**, stating what you verified on hardware and what
    you only inferred from source.
 
 That last distinction matters more than anything else here. The value of
@@ -248,3 +303,7 @@ actually been confirmed on a real console.
 ## Licence
 
 MIT.
+
+Cemu is MPL-2.0 and decaf-emu is GPL. Neither is copied from; both are read
+as documentation of semantics, and the implementation here is written
+independently against libnx.
