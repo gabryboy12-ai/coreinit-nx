@@ -1,0 +1,35 @@
+# Functions currently implemented by coreinit-nx.
+# One symbol per line. Lines starting with # are ignored.
+# Keep in sync with source/ -- census.py measures coverage against this.
+
+# mutex.cpp
+OSInitMutex
+OSInitMutexEx
+OSLockMutex
+OSUnlockMutex
+OSTryLockMutex
+
+# cond.cpp
+OSInitCond
+OSInitCondEx
+OSWaitCond
+OSSignalCond
+
+# thread.cpp
+OSCreateThread
+OSResumeThread
+OSSuspendThread
+OSJoinThread
+OSExitThread
+
+# time.cpp
+OSGetTime
+OSGetSystemTime
+OSGetTick
+OSGetSystemTick
+OSCalendarTimeToTicks
+OSTicksToCalendarTime
+__OSSetAbsoluteSystemTime
+
+# systeminfo.cpp
+OSGetSystemInfo
