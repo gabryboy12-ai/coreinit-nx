@@ -308,7 +308,7 @@ imported symbol names is factual metadata, not game content.
 
 Ordered by measured frequency in the current corpus:
 
-- [ ] **Heaps** — `MEMAllocFromExpHeapEx`, `MEMFreeToExpHeap`,
+- [x] **Heaps** — `MEMAllocFromExpHeapEx`, `MEMFreeToExpHeap`,
       `MEMCreateExpHeapEx`, `MEMAllocFromFrmHeapEx`,
       `MEMRecordStateForFrmHeap`, `MEMFreeByStateToFrmHeap`,
       `MEMGetBaseHeapHandle` and friends. Present in **100%** of the corpus.
