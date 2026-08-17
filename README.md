@@ -4,7 +4,7 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 [libnx](https://github.com/switchbrew/libnx), so that statically
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
-> **Status: early.** Five modules implemented, 29 tests passing on real
+> **Status: early.** seven modules implemented, 29 tests passing on real
 > hardware. Measured coverage: **22.5** of coreinit requirements across a
 > 4-title homebrew corpus and 1 original WiiU title. This is a foundation, not a finished runtime.
 
