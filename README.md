@@ -4,9 +4,9 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 [libnx](https://github.com/switchbrew/libnx), so that statically
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
-> **Status: early.** Five modules implemented, 15 tests passing on real
-> hardware. Measured coverage: **14.2%** of coreinit requirements across a
-> 4-title homebrew corpus. This is a foundation, not a finished runtime.
+> **Status: early.** Five modules implemented, 29 tests passing on real
+> hardware. Measured coverage: **22.5** of coreinit requirements across a
+> 4-title homebrew corpus and 1 original WiiU title. This is a foundation, not a finished runtime.
 
 ---
 
@@ -164,6 +164,72 @@ test only shows that the data is not corrupted. On the Wii U these matter
 because the GPU reads main memory directly and the CPU cache is not coherent
 with it. Under Horizon the situation differs, and for recompiled code these
 may end up closer to no-ops than to real cache operations.
+
+### `coreinit/memfrmheap.h`
+
+`MEMCreateFrmHeapEx`, `MEMDestroyFrmHeap`, `MEMAllocFromFrmHeapEx`,
+`MEMFreeToFrmHeap`, `MEMRecordStateForFrmHeap`, `MEMFreeByStateToFrmHeap`,
+`MEMAdjustFrmHeap`, `MEMGetAllocatableSizeForFrmHeapEx` —
+`MEMFrmHeap` is `0x4c` bytes, `MEMHeapHeader` `0x40`.
+
+The first module that **implements** rather than maps. A frame heap is a
+two-ended stack: allocation moves `head` up from the start or `tail` down
+from the end, freeing resets either to its limit or back to a recorded
+state. No free list, no coalescing.
+
+`malloc` could not be delegated to: `MEMHeapHandle` is a pointer to the
+guest-supplied region, and returned pointers must fall inside it because
+games do arithmetic on them and compare them.
+
+**Verified on hardware:** allocations land inside the guest region;
+alignment up to 256 bytes is honoured even from a deliberately misaligned
+head; `MEMFreeByStateToFrmHeap` restores free space to exactly its prior
+value.
+
+**Assumed, NOT verified:** that a *negative* alignment means "allocate from
+the tail". This is the Revolution SDK convention and the signature takes a
+signed `int`, but it has not been confirmed against decaf-emu.
+
+**Deviations from Cafe OS:**
+- The `MEMFrmHeap` structure at the start of the region is **reserved but
+  not populated**. Recompiled code would read it big-endian while we write
+  little-endian, so writing it would be worse than leaving it alone.
+  Anything that inspects `dataStart`/`dataEnd` directly will see garbage.
+- State records are kept host-side. Cafe OS spends `0x10` bytes of heap per
+  recorded state; we spend none, so reported free space is slightly larger
+  after `MEMRecordStateForFrmHeap`.
+
+### `coreinit/memexpheap.h`, base heaps
+
+`MEMCreateExpHeapEx`, `MEMDestroyExpHeap`, `MEMAllocFromExpHeapEx`,
+`MEMFreeToExpHeap`, `MEMGetTotalFreeSizeForExpHeap`,
+`MEMGetAllocatableSizeForExpHeapEx`, `MEMSetAllocModeForExpHeap`,
+`MEMGetAllocModeForExpHeap`, `MEMGetBaseHeapHandle`,
+`MEMSetBaseHeapHandle` — `MEMExpHeap` is `0x54`, `MEMExpHeapBlock` `0x14`.
+
+A general allocator over a guest-supplied region: block list, coalescing on
+free, first-fit and nearest-fit modes, allocation from either end.
+
+**Cafe OS puts a `0x14` block header inline before every allocation. We keep
+the bookkeeping host-side but charge the same `0x14` anyway.** Without it
+`MEMGetTotalFreeSizeForExpHeap` would report more free space than Cafe OS
+does, and a game allocating until failure would behave differently.
+Over-reporting available memory fails far from its cause.
+
+**Verified on hardware:** freed blocks are reused; freeing three adjacent
+blocks coalesces back to exactly the initial free size; alignment up to 256
+is honoured; a 100-byte request consumes exactly 120 bytes of region.
+
+**Scope is deliberate.** The full ExpHeap API includes groups, visitors,
+debug modes, block resizing and integrity checks. The census shows games
+use six functions. The rest is not implemented — `MEMGetSizeForMBlockExpHeap`
+notably, since it takes only a pointer with no heap handle and would need a
+global block registry.
+
+**Base heaps** do not exist here as they do on Cafe OS, where the system
+creates them before the game starts. `MEMGetBaseHeapHandle` lazily builds an
+8 MB expanded heap on host memory. The size is arbitrary and should become
+configurable, set by the port.
 
 ---
 

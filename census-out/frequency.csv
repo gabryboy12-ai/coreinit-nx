@@ -1,9 +1,9 @@
 library,symbol,kind,titles,pct_of_corpus,implemented
-coreinit,MEMAllocFromExpHeapEx,functions,4,100.0,no
+coreinit,MEMAllocFromExpHeapEx,functions,4,100.0,yes
 coreinit,MEMAllocFromFrmHeapEx,functions,4,100.0,yes
 coreinit,MEMFreeByStateToFrmHeap,functions,4,100.0,yes
-coreinit,MEMFreeToExpHeap,functions,4,100.0,no
-coreinit,MEMGetBaseHeapHandle,functions,4,100.0,no
+coreinit,MEMFreeToExpHeap,functions,4,100.0,yes
+coreinit,MEMGetBaseHeapHandle,functions,4,100.0,yes
 coreinit,MEMRecordStateForFrmHeap,functions,4,100.0,yes
 coreinit,OSGetCoreId,functions,4,100.0,yes
 coreinit,OSGetCurrentThread,functions,4,100.0,yes
@@ -21,11 +21,11 @@ coreinit,DCFlushRange,functions,3,75.0,yes
 coreinit,DCStoreRange,functions,3,75.0,yes
 coreinit,MEMAllocFromDefaultHeap,data,3,75.0,no
 coreinit,MEMAllocFromDefaultHeapEx,data,3,75.0,no
-coreinit,MEMCreateExpHeapEx,functions,3,75.0,no
-coreinit,MEMDestroyExpHeap,functions,3,75.0,no
+coreinit,MEMCreateExpHeapEx,functions,3,75.0,yes
+coreinit,MEMDestroyExpHeap,functions,3,75.0,yes
 coreinit,MEMFreeToDefaultHeap,data,3,75.0,no
 coreinit,MEMFreeToFrmHeap,functions,3,75.0,yes
-coreinit,MEMGetAllocatableSizeForExpHeapEx,functions,3,75.0,no
+coreinit,MEMGetAllocatableSizeForExpHeapEx,functions,3,75.0,yes
 coreinit,MEMGetAllocatableSizeForFrmHeapEx,functions,3,75.0,yes
 coreinit,OSCancelAlarm,functions,3,75.0,no
 coreinit,OSCreateAlarm,functions,3,75.0,no
@@ -309,7 +309,7 @@ coreinit,MEMFindContainHeap,functions,1,25.0,no
 coreinit,MEMFreeToBlockHeap,functions,1,25.0,no
 coreinit,MEMFreeToUnitHeap,functions,1,25.0,no
 coreinit,MEMGetAllocDirForMBlockExpHeap,functions,1,25.0,no
-coreinit,MEMGetAllocModeForExpHeap,functions,1,25.0,no
+coreinit,MEMGetAllocModeForExpHeap,functions,1,25.0,yes
 coreinit,MEMGetAllocatableSizeForBlockHeapEx,functions,1,25.0,no
 coreinit,MEMGetArena,functions,1,25.0,no
 coreinit,MEMGetFillValForHeap,functions,1,25.0,no
@@ -319,7 +319,7 @@ coreinit,MEMGetNextListObject,functions,1,25.0,no
 coreinit,MEMGetNthListObject,functions,1,25.0,no
 coreinit,MEMGetPrevListObject,functions,1,25.0,no
 coreinit,MEMGetTotalFreeSizeForBlockHeap,functions,1,25.0,no
-coreinit,MEMGetTotalFreeSizeForExpHeap,functions,1,25.0,no
+coreinit,MEMGetTotalFreeSizeForExpHeap,functions,1,25.0,yes
 coreinit,MEMGetTrackingLeftInBlockHeap,functions,1,25.0,no
 coreinit,MEMInitBlockHeap,functions,1,25.0,no
 coreinit,MEMInitList,functions,1,25.0,no
@@ -328,8 +328,8 @@ coreinit,MEMPrependListObject,functions,1,25.0,no
 coreinit,MEMRemoveListObject,functions,1,25.0,no
 coreinit,MEMResizeForMBlockExpHeap,functions,1,25.0,no
 coreinit,MEMResizeForMBlockFrmHeap,functions,1,25.0,no
-coreinit,MEMSetAllocModeForExpHeap,functions,1,25.0,no
-coreinit,MEMSetBaseHeapHandle,functions,1,25.0,no
+coreinit,MEMSetAllocModeForExpHeap,functions,1,25.0,yes
+coreinit,MEMSetBaseHeapHandle,functions,1,25.0,yes
 coreinit,MEMSetFillValForHeap,functions,1,25.0,no
 coreinit,MEMSetGroupIDForExpHeap,functions,1,25.0,no
 coreinit,MPDequeTask,functions,1,25.0,no

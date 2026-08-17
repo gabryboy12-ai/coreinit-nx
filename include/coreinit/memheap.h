@@ -26,6 +26,15 @@ typedef enum MEMHeapFlags {
     MEM_HEAP_FLAG_USE_LOCK       = 1 << 2,
 } MEMHeapFlags;
 
+typedef enum MEMBaseHeapType {
+    MEM_BASE_HEAP_MEM1 = 0,
+    MEM_BASE_HEAP_MEM2 = 1,
+    MEM_BASE_HEAP_FG   = 8,
+} MEMBaseHeapType;
+
+MEMHeapHandle MEMGetBaseHeapHandle(MEMBaseHeapType type);
+MEMHeapHandle MEMSetBaseHeapHandle(MEMBaseHeapType type, MEMHeapHandle heap);
+
 #ifdef __cplusplus
 }
 #endif

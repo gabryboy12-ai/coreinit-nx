@@ -52,3 +52,15 @@ MEMRecordStateForFrmHeap
 MEMFreeByStateToFrmHeap
 MEMAdjustFrmHeap
 MEMGetAllocatableSizeForFrmHeapEx
+
+# memexpheap.cpp
+MEMCreateExpHeapEx
+MEMDestroyExpHeap
+MEMAllocFromExpHeapEx
+MEMFreeToExpHeap
+MEMGetTotalFreeSizeForExpHeap
+MEMGetAllocatableSizeForExpHeapEx
+MEMSetAllocModeForExpHeap
+MEMGetAllocModeForExpHeap
+MEMGetBaseHeapHandle
+MEMSetBaseHeapHandle

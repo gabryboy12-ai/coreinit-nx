@@ -5,6 +5,7 @@
 #include "coreinit/systeminfo.h"
 #include "coreinit/cache.h"
 #include "coreinit/memfrmheap.h"
+#include "coreinit/memexpheap.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -357,6 +358,106 @@ static void test_frmheap_exhaustion()
     MEMDestroyFrmHeap(h);
 }
 
+static uint8_t s_expRegion[0x8000] __attribute__((aligned(64)));
+
+static void test_expheap_basic()
+{
+    MEMHeapHandle h = MEMCreateExpHeapEx(s_expRegion, sizeof(s_expRegion), 0);
+    if (!h) { check(false, "MEMCreateExpHeapEx"); return; }
+
+    void *a = MEMAllocFromExpHeapEx(h, 256, 4);
+    void *b = MEMAllocFromExpHeapEx(h, 256, 4);
+
+    const uintptr_t base = (uintptr_t)s_expRegion;
+    const uintptr_t end  = base + sizeof(s_expRegion);
+    check(a && b && a != b &&
+          (uintptr_t)a >= base + 0x54 && (uintptr_t)b < end,
+          "due allocazioni distinte dentro la regione");
+
+    MEMDestroyExpHeap(h);
+}
+
+static void test_expheap_free_and_reuse()
+{
+    MEMHeapHandle h = MEMCreateExpHeapEx(s_expRegion, sizeof(s_expRegion), 0);
+
+    void *a = MEMAllocFromExpHeapEx(h, 512, 4);
+    void *b = MEMAllocFromExpHeapEx(h, 512, 4);
+    MEMFreeToExpHeap(h, a);
+    void *c = MEMAllocFromExpHeapEx(h, 512, 4);
+
+    printf("  a=%p b=%p c=%p\n", a, b, c);
+    check(c == a, "il blocco liberato viene riusato");
+
+    MEMFreeToExpHeap(h, b);
+    MEMFreeToExpHeap(h, c);
+    MEMDestroyExpHeap(h);
+}
+
+static void test_expheap_coalesce()
+{
+    MEMHeapHandle h = MEMCreateExpHeapEx(s_expRegion, sizeof(s_expRegion), 0);
+    const uint32_t empty = MEMGetTotalFreeSizeForExpHeap(h);
+
+    void *a = MEMAllocFromExpHeapEx(h, 512, 4);
+    void *b = MEMAllocFromExpHeapEx(h, 512, 4);
+    void *c = MEMAllocFromExpHeapEx(h, 512, 4);
+    MEMFreeToExpHeap(h, a);
+    MEMFreeToExpHeap(h, b);
+    MEMFreeToExpHeap(h, c);
+
+    const uint32_t after = MEMGetTotalFreeSizeForExpHeap(h);
+    printf("  vuoto=%lu dopo=%lu\n",
+           (unsigned long)empty, (unsigned long)after);
+    check(after == empty, "liberare tutto ricompatta l'intera regione");
+
+    MEMDestroyExpHeap(h);
+}
+
+static void test_expheap_alignment()
+{
+    MEMHeapHandle h = MEMCreateExpHeapEx(s_expRegion, sizeof(s_expRegion), 0);
+    MEMAllocFromExpHeapEx(h, 3, 4);
+    void *p = MEMAllocFromExpHeapEx(h, 64, 256);
+    check(p && ((uintptr_t)p & 255) == 0, "ExpHeap rispetta l'allineamento");
+    MEMDestroyExpHeap(h);
+}
+
+static void test_expheap_bottom()
+{
+    MEMHeapHandle h = MEMCreateExpHeapEx(s_expRegion, sizeof(s_expRegion), 0);
+    void *top    = MEMAllocFromExpHeapEx(h, 256, 4);
+    void *bottom = MEMAllocFromExpHeapEx(h, 256, -4);
+    printf("  top=%p bottom=%p\n", top, bottom);
+    check(top && bottom && bottom > top,
+          "allineamento negativo alloca dal fondo");
+    MEMDestroyExpHeap(h);
+}
+
+static void test_expheap_overhead()
+{
+    MEMHeapHandle h = MEMCreateExpHeapEx(s_expRegion, sizeof(s_expRegion), 0);
+    const uint32_t before = MEMGetTotalFreeSizeForExpHeap(h);
+    MEMAllocFromExpHeapEx(h, 100, 4);
+    const uint32_t after = MEMGetTotalFreeSizeForExpHeap(h);
+
+    const uint32_t consumed = before - after;
+    printf("  consumati %lu per 100 richiesti\n", (unsigned long)consumed);
+    check(consumed >= 100 + 0x14,
+          "l'overhead di 0x14 per blocco viene addebitato");
+
+    MEMDestroyExpHeap(h);
+}
+
+static void test_base_heap()
+{
+    MEMHeapHandle h = MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM2);
+    if (!h) { check(false, "MEMGetBaseHeapHandle"); return; }
+    void *p = MEMAllocFromExpHeapEx(h, 4096, 32);
+    check(p && ((uintptr_t)p & 31) == 0, "allocazione dal base heap MEM2");
+    if (p) MEMFreeToExpHeap(h, p);
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -385,6 +486,13 @@ int main(int argc, char **argv)
     test_frmheap_alignment();
     test_frmheap_state();
     test_frmheap_exhaustion();
+    test_expheap_basic();
+    test_expheap_free_and_reuse();
+    test_expheap_coalesce();
+    test_expheap_alignment();
+    test_expheap_bottom();
+    test_expheap_overhead();
+    test_base_heap();
 
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
