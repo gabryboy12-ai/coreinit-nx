@@ -42,3 +42,13 @@ OSSetThreadCleanupCallback
 DCFlushRange
 DCStoreRange
 OSGetTitleID
+
+# memfrmheap.cpp
+MEMCreateFrmHeapEx
+MEMDestroyFrmHeap
+MEMAllocFromFrmHeapEx
+MEMFreeToFrmHeap
+MEMRecordStateForFrmHeap
+MEMFreeByStateToFrmHeap
+MEMAdjustFrmHeap
+MEMGetAllocatableSizeForFrmHeapEx

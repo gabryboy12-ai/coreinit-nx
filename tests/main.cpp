@@ -4,6 +4,7 @@
 #include "coreinit/time.h"
 #include "coreinit/systeminfo.h"
 #include "coreinit/cache.h"
+#include "coreinit/memfrmheap.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -276,6 +277,86 @@ static void test_cache_ops()
     check(buffer[42] == 42, "le operazioni di cache non corrompono i dati");
 }
 
+static uint8_t s_heapRegion[0x4000] __attribute__((aligned(64)));
+
+static void test_frmheap_basic()
+{
+    MEMHeapHandle h = MEMCreateFrmHeapEx(s_heapRegion, sizeof(s_heapRegion), 0);
+    if (!h) { check(false, "MEMCreateFrmHeapEx"); return; }
+
+    void *a = MEMAllocFromFrmHeapEx(h, 256, 4);
+    void *b = MEMAllocFromFrmHeapEx(h, 256, 4);
+
+    const uintptr_t base = (uintptr_t)s_heapRegion;
+    const uintptr_t end  = base + sizeof(s_heapRegion);
+    const bool inside = a && b &&
+        (uintptr_t)a >= base + 0x4C && (uintptr_t)a < end &&
+        (uintptr_t)b >= base + 0x4C && (uintptr_t)b < end;
+
+    check(inside, "le allocazioni cadono dentro la regione del guest");
+    check(b > a, "la testa cresce verso l'alto");
+
+    MEMDestroyFrmHeap(h);
+}
+
+static void test_frmheap_tail()
+{
+    MEMHeapHandle h = MEMCreateFrmHeapEx(s_heapRegion, sizeof(s_heapRegion), 0);
+    void *head = MEMAllocFromFrmHeapEx(h, 256, 4);
+    void *tail = MEMAllocFromFrmHeapEx(h, 256, -4);   // negativo = dalla coda
+
+    printf("  head=%p tail=%p\n", head, tail);
+    check(head && tail && tail > head,
+          "allineamento negativo alloca dalla coda");
+
+    MEMDestroyFrmHeap(h);
+}
+
+static void test_frmheap_alignment()
+{
+    MEMHeapHandle h = MEMCreateFrmHeapEx(s_heapRegion, sizeof(s_heapRegion), 0);
+    MEMAllocFromFrmHeapEx(h, 1, 4);                  // disallinea di proposito
+    void *p = MEMAllocFromFrmHeapEx(h, 64, 256);
+
+    check(p && ((uintptr_t)p & 255) == 0, "allineamento a 256 rispettato");
+    MEMDestroyFrmHeap(h);
+}
+
+static void test_frmheap_state()
+{
+    MEMHeapHandle h = MEMCreateFrmHeapEx(s_heapRegion, sizeof(s_heapRegion), 0);
+    MEMAllocFromFrmHeapEx(h, 128, 4);
+
+    const uint32_t before = MEMGetAllocatableSizeForFrmHeapEx(h, 4);
+    MEMRecordStateForFrmHeap(h, 0x54455354);         // 'TEST'
+    MEMAllocFromFrmHeapEx(h, 1024, 4);
+    const uint32_t during = MEMGetAllocatableSizeForFrmHeapEx(h, 4);
+
+    const int32_t ok = MEMFreeByStateToFrmHeap(h, 0x54455354);
+    const uint32_t after = MEMGetAllocatableSizeForFrmHeapEx(h, 4);
+
+    printf("  prima=%lu durante=%lu dopo=%lu\n",
+           (unsigned long)before, (unsigned long)during, (unsigned long)after);
+    check(ok == 1 && during < before && after == before,
+          "record/free by state ripristina esattamente lo stato");
+
+    MEMDestroyFrmHeap(h);
+}
+
+static void test_frmheap_exhaustion()
+{
+    MEMHeapHandle h = MEMCreateFrmHeapEx(s_heapRegion, sizeof(s_heapRegion), 0);
+    void *big = MEMAllocFromFrmHeapEx(h, sizeof(s_heapRegion) * 2, 4);
+    check(big == nullptr, "allocazione oltre la capacita' fallisce");
+
+    MEMFreeToFrmHeap(h, MEM_FRM_HEAP_FREE_ALL);
+    const uint32_t full = MEMGetAllocatableSizeForFrmHeapEx(h, 4);
+    check(full > sizeof(s_heapRegion) - 0x100,
+          "free ALL restituisce quasi tutta la regione");
+
+    MEMDestroyFrmHeap(h);
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -299,6 +380,11 @@ int main(int argc, char **argv)
     test_core_id();
     test_current_thread();
     test_cache_ops();
+    test_frmheap_basic();
+    test_frmheap_tail();
+    test_frmheap_alignment();
+    test_frmheap_state();
+    test_frmheap_exhaustion();
 
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);

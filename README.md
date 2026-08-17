@@ -191,6 +191,35 @@ which is why implementing seven well-chosen functions moved it from 9.6% to
 
 Current results are in `census/`.
 
+### Linked stubs are not usage
+
+An RPX import table lists every stub the linker pulled in, not the
+functions the code actually calls. Black Ops 2 declares **959** coreinit
+imports — including kernel internals like `PPCMfhid0` and
+`__KernelSetUserModeExHandler` that no game calls. That is essentially
+coreinit's entire export table.
+
+Relocations are the ground truth: if nothing relocates against a symbol,
+nothing calls it. Filtering the symbol table against `.rela.*` entries
+brings Black Ops 2 down to **157** — an 83% reduction — while leaving the
+wut homebrew figures untouched, because wut's linker already garbage-
+collects unused stubs and Treyarch's did not.
+
+Anyone analysing Wii U binaries should apply this filter. Without it the
+numbers are an upper bound roughly five times the real demand.
+
+### What the two corpora disagree about
+
+The homebrew corpus put the 25 `FSA*` functions at the top of the
+filesystem priority list. Black Ops 2 calls **none of them** — it uses the
+high-level `FS*` API (`FSInit`, `FSAddClient`, `FSInitCmdBlock`,
+`FSOpenFile`). `FSA*` are the low-level primitives wut's own runtime uses
+internally.
+
+Implementing the filesystem from homebrew data alone would have meant
+writing 25 functions the game never calls. This is the clearest argument
+for measuring against real titles.
+
 ### Current corpus and its limits
 
 4 homebrew titles: 681 distinct imports across 8 libraries, 348 in
@@ -256,6 +285,11 @@ project does not yet have.
 
 **Guest stacks.** See the thread section above. This one needs someone who
 knows how the recompiler emits code.
+
+**Dynamic module loading.** `OSDynLoad_Acquire` and `OSDynLoad_FindExport`
+are used by Black Ops 2. The game resolves symbols at runtime, which sits
+awkwardly with static recompilation — that approach assumes everything is
+known ahead of time. What gets loaded, and when, needs investigating.
 
 ---
 
