@@ -34,9 +34,9 @@ coreinit,OSEnableHomeButtonMenu,functions,3,75.0,no
 coreinit,OSFatal,functions,3,75.0,yes
 coreinit,OSGetAlarmUserData,functions,3,75.0,no
 coreinit,OSGetSystemTime,functions,3,75.0,yes
-coreinit,OSGetThreadAffinity,functions,3,75.0,no
-coreinit,OSGetThreadPriority,functions,3,75.0,no
-coreinit,OSGetThreadSpecific,functions,3,75.0,no
+coreinit,OSGetThreadAffinity,functions,3,75.0,yes
+coreinit,OSGetThreadPriority,functions,3,75.0,yes
+coreinit,OSGetThreadSpecific,functions,3,75.0,yes
 coreinit,OSInitCond,functions,3,75.0,yes
 coreinit,OSInitMutex,functions,3,75.0,yes
 coreinit,OSInitMutexEx,functions,3,75.0,yes
@@ -54,10 +54,10 @@ coreinit,OSScreenPutFontEx,functions,3,75.0,no
 coreinit,OSScreenSetBufferEx,functions,3,75.0,no
 coreinit,OSSetAlarm,functions,3,75.0,no
 coreinit,OSSetAlarmUserData,functions,3,75.0,no
-coreinit,OSSetThreadAffinity,functions,3,75.0,no
-coreinit,OSSetThreadDeallocator,functions,3,75.0,no
-coreinit,OSSetThreadPriority,functions,3,75.0,no
-coreinit,OSSetThreadSpecific,functions,3,75.0,no
+coreinit,OSSetThreadAffinity,functions,3,75.0,yes
+coreinit,OSSetThreadDeallocator,functions,3,75.0,yes
+coreinit,OSSetThreadPriority,functions,3,75.0,yes
+coreinit,OSSetThreadSpecific,functions,3,75.0,yes
 coreinit,OSSignalCond,functions,3,75.0,yes
 coreinit,OSSignalSemaphore,functions,3,75.0,no
 coreinit,OSTicksToCalendarTime,functions,3,75.0,yes
@@ -210,7 +210,7 @@ coreinit,OSGetSemaphoreCount,functions,2,50.0,no
 coreinit,OSIsDebuggerInitialized,functions,2,50.0,no
 coreinit,OSIsDebuggerPresent,functions,2,50.0,no
 coreinit,OSScreenShutdown,functions,2,50.0,no
-coreinit,OSSetThreadName,functions,2,50.0,no
+coreinit,OSSetThreadName,functions,2,50.0,yes
 coreinit,OSTryLockMutex,functions,2,50.0,yes
 coreinit,OSWaitSemaphore,functions,2,50.0,no
 coreinit,_Exit,functions,2,50.0,yes
@@ -389,7 +389,7 @@ coreinit,OSGetMainCoreId,functions,1,25.0,no
 coreinit,OSGetStackPointer,functions,1,25.0,no
 coreinit,OSGetSystemMessageQueue,functions,1,25.0,no
 coreinit,OSGetSystemTick,functions,1,25.0,yes
-coreinit,OSGetThreadName,functions,1,25.0,no
+coreinit,OSGetThreadName,functions,1,25.0,yes
 coreinit,OSGetTick,functions,1,25.0,yes
 coreinit,OSInitAlarmQueue,functions,1,25.0,no
 coreinit,OSInitAlarmQueueEx,functions,1,25.0,no

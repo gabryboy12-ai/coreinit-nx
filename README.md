@@ -5,8 +5,8 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
-> **Status: early.** Eight modules implemented, 34 tests passing on real
-> hardware. Measured coverage: **26.0** of coreinit requirements across a
+> **Status: early.** Eight modules implemented, 36 tests passing on real
+> hardware. Measured coverage: **26.0%** of coreinit requirements across a
 > 4-title homebrew corpus and 1 original WiiU title. This is a foundation, 
 > not a finished runtime.
 ---

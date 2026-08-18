@@ -15,6 +15,25 @@ typedef struct OSThread {
 typedef int (*OSThreadEntryPointFn)(int argc, const char **argv);
 typedef uint8_t OSThreadAttributes;
 typedef void (*OSThreadCleanupCallbackFn)(OSThread *thread, void *stack);
+typedef enum OSThreadSpecificID {
+    OS_THREAD_SPECIFIC_0 = 0,
+    // ... fino a 13; 14 e 15 sono riservati da wut
+} OSThreadSpecificID;
+
+// DA VERIFICARE la firma esatta in wut/include/coreinit/thread.h
+typedef void (*OSThreadDeallocatorFn)(OSThread *thread, void *stack);
+
+uint32_t    OSGetThreadAffinity(OSThread *thread);
+int32_t     OSGetThreadPriority(OSThread *thread);
+const char *OSGetThreadName(OSThread *thread);
+int32_t     OSSetThreadAffinity(OSThread *thread, uint32_t affinity);
+int32_t     OSSetThreadPriority(OSThread *thread, int32_t priority);
+void        OSSetThreadName(OSThread *thread, const char *name);
+
+void  *OSGetThreadSpecific(OSThreadSpecificID id);
+void   OSSetThreadSpecific(OSThreadSpecificID id, void *value);
+
+OSThreadDeallocatorFn OSSetThreadDeallocator(OSThread *thread, OSThreadDeallocatorFn fn);
 
 enum {
     OS_THREAD_ATTRIB_AFFINITY_CPU0 = 1 << 0,

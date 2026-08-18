@@ -528,6 +528,65 @@ static void test_saves_done()
     check(true, "OSSavesDone_ReadyToRelease e' una no-op che ritorna");
 }
 
+static volatile void *s_tlsFromThread;
+
+static int tls_worker(int argc, const char **argv)
+{
+    (void)argc; (void)argv;
+    // Deve partire vuoto: gli slot sono per-thread, non globali.
+    s_tlsFromThread = OSGetThreadSpecific(OS_THREAD_SPECIFIC_0);
+    return 0;
+}
+
+static void test_thread_introspection()
+{
+    static OSThread th;
+    static uint8_t  stack[0x4000];
+
+    if (!OSCreateThread(&th, tls_worker, 0, nullptr,
+                        stack + sizeof(stack), sizeof(stack),
+                        7, OS_THREAD_ATTRIB_AFFINITY_CPU1)) {
+        check(false, "OSCreateThread"); return;
+    }
+
+    check(OSGetThreadPriority(&th) == 7,
+          "la priorita' torna com'era stata passata");
+    check(OSGetThreadAffinity(&th) == OS_THREAD_ATTRIB_AFFINITY_CPU1,
+          "l'affinita' torna come maschera originale");
+
+    OSSetThreadName(&th, "worker");
+    check(OSGetThreadName(&th) &&
+          strcmp(OSGetThreadName(&th), "worker") == 0,
+          "il nome del thread viene conservato");
+
+    OSResumeThread(&th);
+    int result = 0;
+    OSJoinThread(&th, &result);
+}
+
+static void test_thread_specific()
+{
+    OSSetThreadSpecific(OS_THREAD_SPECIFIC_0, (void *)0x1234);
+    check(OSGetThreadSpecific(OS_THREAD_SPECIFIC_0) == (void *)0x1234,
+          "TLS: scrittura e rilettura sullo stesso thread");
+
+    s_tlsFromThread = (void *)0xFFFF;
+
+    static OSThread th;
+    static uint8_t  stack[0x4000];
+    OSCreateThread(&th, tls_worker, 0, nullptr,
+                   stack + sizeof(stack), sizeof(stack),
+                   16, OS_THREAD_ATTRIB_AFFINITY_ANY);
+    OSResumeThread(&th);
+    int result = 0;
+    OSJoinThread(&th, &result);
+
+    check(s_tlsFromThread == nullptr,
+          "TLS: ogni thread parte con gli slot vuoti");
+
+    OSSetThreadSpecific(OS_THREAD_SPECIFIC_0, nullptr);
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -568,6 +627,8 @@ int main(int argc, char **argv)
     test_os_snprintf();
     test_osfatal_handler();
     test_saves_done();
+    test_thread_introspection();
+    test_thread_specific();
 
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);

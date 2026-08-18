@@ -84,3 +84,14 @@ _Exit
 memcpy
 memmove
 memset
+
+# thread.cpp -- introspection and TLS
+OSGetThreadPriority
+OSSetThreadPriority
+OSGetThreadAffinity
+OSSetThreadAffinity
+OSGetThreadName
+OSSetThreadName
+OSGetThreadSpecific
+OSSetThreadSpecific
+OSSetThreadDeallocator

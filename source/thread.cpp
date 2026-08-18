@@ -8,9 +8,14 @@ namespace {
 constexpr size_t kPageSize     = 0x1000;
 constexpr size_t kMinHostStack = 0x10000;
 
+// 16 slot per thread. Un array thread_local invece di appoggiarsi a
+    // HostThread: cosi' funziona anche per thread che non abbiamo creato noi.
+    constexpr int kThreadSpecificSlots = 16;
+    thread_local void *t_specific[kThreadSpecificSlots] = {};
+
 struct HostThread {
     ::Thread             handle;
-    OSThread            *guest;                // <-- nuovo
+    OSThread            *guest;                
     OSThreadEntryPointFn entry;
     int32_t              argc;
     const char         **argv;
@@ -18,16 +23,22 @@ struct HostThread {
     uint32_t             guestStackSize;
     int32_t              exitResult;
     int32_t              suspendCount;
-    OSThreadCleanupCallbackFn cleanup;         // <-- nuovo
+    OSThreadCleanupCallbackFn cleanup;        
     bool                 created;
     bool                 started;
     bool                 detached;
+    int32_t               cafePriority;    // come passata dal gioco
+    uint32_t              cafeAffinity;    // bitfield originale su 3 core
+    const char           *name;
+    OSThreadDeallocatorFn deallocator;
 
     void init() {
         guest = nullptr; entry = nullptr; argc = 0; argv = nullptr;
         guestStack = nullptr; guestStackSize = 0;
         exitResult = 0; suspendCount = 0; cleanup = nullptr;
         created = false; started = false; detached = false;
+        cafePriority = 16; cafeAffinity = OS_THREAD_ATTRIB_AFFINITY_ANY;
+        name = nullptr; deallocator = nullptr;
     }
 };
 
@@ -45,6 +56,7 @@ void trampoline(void *arg)
     t_current = h;
     h->exitResult = h->entry(h->argc, h->argv);
     if (h->cleanup) h->cleanup(h->guest, h->guestStack);
+    if (h->deallocator) h->deallocator(h->guest, h->guestStack);
 }
 
 // Cafe OS: 0-31, piu' basso = piu' prioritario.
@@ -98,6 +110,10 @@ int32_t OSCreateThread(OSThread *thread, OSThreadEntryPointFn entry,
     h->started        = false;
     h->detached       = (attributes & OS_THREAD_ATTRIB_DETACHED) != 0;
     h->guest          = thread;
+    h->cafePriority = priority;
+    h->cafeAffinity = attributes & OS_THREAD_ATTRIB_AFFINITY_ANY;
+    h->name         = nullptr;
+    h->deallocator  = nullptr;
     h->cleanup        = nullptr;
 
     const int32_t prio    = mapPriority(priority);
@@ -188,6 +204,76 @@ OSThreadCleanupCallbackFn OSSetThreadCleanupCallback(
     auto *h = g_threads.get(thread);
     OSThreadCleanupCallbackFn previous = h->cleanup;
     h->cleanup = callback;
+    return previous;
+}
+
+// I getter restituiscono quello che il GIOCO ha impostato, non quello che
+// ha ottenuto Horizon.
+//
+// La mappatura delle priorita' e' lossy: 32 livelli Cafe compressi nella
+// finestra disponibile. Se interrogassimo il kernel e invertissimo la
+// formula, un pattern leggi-modifica-scrivi ("alzati di uno rispetto a
+// dove sei") andrebbe alla deriva a ogni giro.
+// Stesso ragionamento per l'affinita': il gioco passa una maschera su 3
+// core, noi ne scegliamo uno solo. Restituire la maschera originale e'
+// l'unica risposta sensata.
+
+int32_t OSGetThreadPriority(OSThread *thread)
+{
+    return g_threads.get(thread)->cafePriority;
+}
+
+int32_t OSSetThreadPriority(OSThread *thread, int32_t priority)
+{
+    auto *h = g_threads.get(thread);
+    h->cafePriority = priority;
+    // NON IMPLEMENTATO: cambiare la priorita' di un thread gia' avviato.
+    return 1;
+}
+
+uint32_t OSGetThreadAffinity(OSThread *thread)
+{
+    return g_threads.get(thread)->cafeAffinity;
+}
+
+int32_t OSSetThreadAffinity(OSThread *thread, uint32_t affinity)
+{
+    auto *h = g_threads.get(thread);
+    h->cafeAffinity = affinity & OS_THREAD_ATTRIB_AFFINITY_ANY;
+    // NON IMPLEMENTATO: migrare davvero un thread gia' in esecuzione.
+    // Il valore viene ricordato e riportato, ma non applicato.
+    return 1;
+}
+
+const char *OSGetThreadName(OSThread *thread)
+{
+    return g_threads.get(thread)->name;
+}
+
+void OSSetThreadName(OSThread *thread, const char *name)
+{
+    // Cafe OS conserva il puntatore, non copia la stringa.
+    g_threads.get(thread)->name = name;
+}
+
+void *OSGetThreadSpecific(OSThreadSpecificID id)
+{
+    if ((int)id < 0 || (int)id >= kThreadSpecificSlots) return nullptr;
+    return t_specific[(int)id];
+}
+
+void OSSetThreadSpecific(OSThreadSpecificID id, void *value)
+{
+    if ((int)id < 0 || (int)id >= kThreadSpecificSlots) return;
+    t_specific[(int)id] = value;
+}
+
+OSThreadDeallocatorFn OSSetThreadDeallocator(OSThread *thread,
+                                             OSThreadDeallocatorFn fn)
+{
+    auto *h = g_threads.get(thread);
+    OSThreadDeallocatorFn previous = h->deallocator;
+    h->deallocator = fn;
     return previous;
 }
 
