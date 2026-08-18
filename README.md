@@ -6,7 +6,7 @@ recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
 > **Status: early.** Eight modules implemented, 36 tests passing on real
-> hardware. Measured coverage: **26.0%** of coreinit requirements across a
+> hardware. Measured coverage: **30.3%** of coreinit requirements across a
 > 4-title homebrew corpus and 1 original WiiU title. This is a foundation, 
 > not a finished runtime.
 ---
@@ -264,6 +264,31 @@ Note `__os_snprintf` takes `size_t`, not `uint32_t`. On aarch64 those are 64
 and 32 bits respectively — unlike `int` and `int32_t`, they are genuinely
 different types.
 
+### Thread introspection and thread-specific storage
+
+`OSGetThreadPriority`, `OSSetThreadPriority`, `OSGetThreadAffinity`,
+`OSSetThreadAffinity`, `OSGetThreadName`, `OSSetThreadName`,
+`OSGetThreadSpecific`, `OSSetThreadSpecific`, `OSSetThreadDeallocator`
+
+**Getters return what the game set, not what Horizon granted.** The priority
+mapping is lossy — 32 Cafe levels compressed into the available Horizon
+window — so querying the kernel and inverting the formula would return a
+different number than the one passed to `OSCreateThread`. Read-modify-write
+patterns ("raise yourself one above where you are") would drift on every
+iteration. Same reasoning for affinity: the game passes a 3-core mask, we
+pick a single core, and the original mask is the only sensible answer.
+
+Thread-specific storage uses a 16-slot `thread_local` array rather than
+hanging off `HostThread`, so it works for threads we did not create — the
+main thread, or anything started by the C library. `OSGetThreadSpecific`
+and `OSSetThreadSpecific` take only an ID and act on the current thread.
+
+**Verified on hardware:** slots are genuinely per-thread — a child thread
+starts with them empty while the parent holds a value.
+
+**Not implemented:** changing priority or affinity of an already-running
+thread. Both are recorded and reported back, neither is applied.
+
 ---
 
 ## The import census
@@ -352,7 +377,7 @@ Ordered by measured frequency in the current corpus:
       pointers have to fall inside that region — games do arithmetic on them.
 - [ ] `OSSavesDone_ReadyToRelease` — 100%
 - [ ] Alarms — `OSCreateAlarm`, `OSCancelAlarm`, `OSGetAlarmUserData` — 75%
-- [ ] Thread-local storage — `OSGetThreadSpecific`, `OSSetThreadSpecific`
+- [x] Thread-local storage — `OSGetThreadSpecific`, `OSSetThreadSpecific`
 - [ ] `OSFastMutex_*` — a second, distinct mutex family
 - [ ] Semaphores — `OSInitSemaphore`
 - [ ] Spinlocks — `OSUninterruptibleSpinLock_*`
