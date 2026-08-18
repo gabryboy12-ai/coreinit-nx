@@ -4,10 +4,11 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 [libnx](https://github.com/switchbrew/libnx), so that statically
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
-> **Status: early.** seven modules implemented, 29 tests passing on real
-> hardware. Measured coverage: **22.5** of coreinit requirements across a
-> 4-title homebrew corpus and 1 original WiiU title. This is a foundation, not a finished runtime.
-
+=======
+> **Status: early.** Eight modules implemented, 34 tests passing on real
+> hardware. Measured coverage: **26.0** of coreinit requirements across a
+> 4-title homebrew corpus and 1 original WiiU title. This is a foundation, 
+> not a finished runtime.
 ---
 
 ## Why this exists
@@ -230,6 +231,38 @@ global block registry.
 creates them before the game starts. `MEMGetBaseHeapHandle` lazily builds an
 8 MB expanded heap on host memory. The size is arbitrary and should become
 configurable, set by the port.
+
+### `coreinit/debug.h` and the libc question
+
+`OSReport`, `OSReportVerbose`, `OSReportInfo`, `OSReportWarn`, `OSVReport`,
+`OSConsoleWrite`, `OSFatal`, `__os_snprintf`, `OSSavesDone_ReadyToRelease`
+
+Output goes through a settable sink (`coreinitNxSetLogSink`), defaulting to
+stdout. `OSFatal` never returns on Cafe OS — it shows an error screen the
+user powers off from — so the default handler logs and blocks. A port will
+want `coreinitNxSetFatalHandler`.
+
+`OSSavesDone_ReadyToRelease` is a deliberate no-op: nothing here owns the
+foreground. It is present because every title calls it.
+
+**On symbol collisions with the C library.** `coreinit` exports `exit`,
+`_Exit`, `memcpy`, `memmove` and `memset`, because on the Wii U it *was*
+the system C library. These are not Nintendo APIs and this project does not
+implement them: the linker resolves them against newlib, whose semantics
+match and whose ARM64 implementations are better than anything written here.
+
+That is the correct answer rather than a workaround, and it means those
+symbols genuinely count as covered. `implemented.txt` lists them in a
+separate section so the distinction stays visible.
+
+Only Cafe OS-specific names need writing — `__os_snprintf`, `memclr` — plus
+the Green Hills compiler runtime (`__ghsLock`, `__ghs_flock_file`,
+`__cpp_exception_init_ptr`), which no host library provides. Those remain
+unimplemented.
+
+Note `__os_snprintf` takes `size_t`, not `uint32_t`. On aarch64 those are 64
+and 32 bits respectively — unlike `int` and `int32_t`, they are genuinely
+different types.
 
 ---
 

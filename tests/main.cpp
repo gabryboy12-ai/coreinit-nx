@@ -6,9 +6,13 @@
 #include "coreinit/cache.h"
 #include "coreinit/memfrmheap.h"
 #include "coreinit/memexpheap.h"
+#include "coreinit/debug.h"
+#include "coreinit/foreground.h"
+#include "coreinit/internal.h"
 
 #include <switch.h>
 #include <cstdio>
+#include <cstring>
 
 static int g_failures = 0;
 
@@ -458,6 +462,72 @@ static void test_base_heap()
     if (p) MEMFreeToExpHeap(h, p);
 }
 
+static char     s_logBuf[512];
+static uint32_t s_logLen;
+static bool     s_fatalSeen;
+
+static void captureSink(const char *text, uint32_t size)
+{
+    const uint32_t room = sizeof(s_logBuf) - 1 - s_logLen;
+    const uint32_t n = size < room ? size : room;
+    memcpy(s_logBuf + s_logLen, text, n);
+    s_logLen += n;
+    s_logBuf[s_logLen] = '\0';
+}
+
+// Returning from a fatal handler is a test-only affordance: on Cafe OS
+// OSFatal never returns.
+static void captureFatal(const char *msg)
+{
+    s_fatalSeen = (msg != nullptr && strcmp(msg, "boom") == 0);
+}
+
+static void test_osreport()
+{
+    s_logLen = 0; s_logBuf[0] = '\0';
+    coreinitNxSetLogSink(captureSink);
+    OSReport("value=%d name=%s", 42, "test");
+    coreinitNxSetLogSink(nullptr);
+
+    printf("  catturato: \"%s\"\n", s_logBuf);
+    check(strcmp(s_logBuf, "value=42 name=test") == 0,
+          "OSReport formatta e instrada al sink");
+}
+
+static void test_console_write()
+{
+    s_logLen = 0; s_logBuf[0] = '\0';
+    coreinitNxSetLogSink(captureSink);
+    OSConsoleWrite("abcdef", 3);
+    coreinitNxSetLogSink(nullptr);
+
+    check(strcmp(s_logBuf, "abc") == 0,
+          "OSConsoleWrite rispetta la lunghezza richiesta");
+}
+
+static void test_os_snprintf()
+{
+    char buf[8];
+    const int n = __os_snprintf(buf, sizeof(buf), "%s", "0123456789");
+    check(strlen(buf) == 7 && n == 10,
+          "__os_snprintf tronca ma riporta la lunghezza piena");
+}
+
+static void test_osfatal_handler()
+{
+    s_fatalSeen = false;
+    coreinitNxSetFatalHandler(captureFatal);
+    OSFatal("boom");
+    coreinitNxSetFatalHandler(nullptr);
+    check(s_fatalSeen, "OSFatal invoca il gestore installato");
+}
+
+static void test_saves_done()
+{
+    OSSavesDone_ReadyToRelease();
+    check(true, "OSSavesDone_ReadyToRelease e' una no-op che ritorna");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -493,6 +563,11 @@ int main(int argc, char **argv)
     test_expheap_bottom();
     test_expheap_overhead();
     test_base_heap();
+    test_osreport();
+    test_console_write();
+    test_os_snprintf();
+    test_osfatal_handler();
+    test_saves_done();
 
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);

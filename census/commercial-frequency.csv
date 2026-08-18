@@ -64,7 +64,7 @@ coreinit,OSCancelAlarms,functions,1,100.0,no
 coreinit,OSCancelThread,functions,1,100.0,no
 coreinit,OSCompareAndSwapAtomic64,functions,1,100.0,no
 coreinit,OSCompareAndSwapAtomicEx64,functions,1,100.0,no
-coreinit,OSConsoleWrite,functions,1,100.0,no
+coreinit,OSConsoleWrite,functions,1,100.0,yes
 coreinit,OSCreateAlarm,functions,1,100.0,no
 coreinit,OSCreateThread,functions,1,100.0,yes
 coreinit,OSDetachThread,functions,1,100.0,no
@@ -106,10 +106,10 @@ coreinit,OSPanic,functions,1,100.0,no
 coreinit,OSReceiveMessage,functions,1,100.0,no
 coreinit,OSReleaseForeground,functions,1,100.0,no
 coreinit,OSReleaseSpinLock,functions,1,100.0,no
-coreinit,OSReport,functions,1,100.0,no
+coreinit,OSReport,functions,1,100.0,yes
 coreinit,OSResetEvent,functions,1,100.0,no
 coreinit,OSResumeThread,functions,1,100.0,yes
-coreinit,OSSavesDone_ReadyToRelease,functions,1,100.0,no
+coreinit,OSSavesDone_ReadyToRelease,functions,1,100.0,yes
 coreinit,OSSetAlarm,functions,1,100.0,no
 coreinit,OSSetExceptionCallback,functions,1,100.0,no
 coreinit,OSSetPeriodicAlarm,functions,1,100.0,no
@@ -138,7 +138,7 @@ coreinit,UCDeleteSysConfig,functions,1,100.0,no
 coreinit,UCOpen,functions,1,100.0,no
 coreinit,UCReadSysConfig,functions,1,100.0,no
 coreinit,UCWriteSysConfig,functions,1,100.0,no
-coreinit,_Exit,functions,1,100.0,no
+coreinit,_Exit,functions,1,100.0,yes
 coreinit,__atexit_cleanup,data,1,100.0,no
 coreinit,__cpp_exception_cleanup_ptr,data,1,100.0,no
 coreinit,__cpp_exception_init_ptr,data,1,100.0,no
@@ -157,10 +157,10 @@ coreinit,__ghs_funlock_file,functions,1,100.0,no
 coreinit,__stdio_cleanup,data,1,100.0,no
 coreinit,_iob,data,1,100.0,no
 coreinit,environ,data,1,100.0,no
-coreinit,exit,functions,1,100.0,no
-coreinit,memcpy,functions,1,100.0,no
-coreinit,memmove,functions,1,100.0,no
-coreinit,memset,functions,1,100.0,no
+coreinit,exit,functions,1,100.0,yes
+coreinit,memcpy,functions,1,100.0,yes
+coreinit,memmove,functions,1,100.0,yes
+coreinit,memset,functions,1,100.0,yes
 dmae.rpl,DMAECopyMem,functions,1,100.0,no
 dmae.rpl,DMAEFillMem,functions,1,100.0,no
 gx2,GX2AllocateTilingApertureEx,functions,1,100.0,no

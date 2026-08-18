@@ -64,3 +64,23 @@ MEMSetAllocModeForExpHeap
 MEMGetAllocModeForExpHeap
 MEMGetBaseHeapHandle
 MEMSetBaseHeapHandle
+
+# debug.cpp
+OSConsoleWrite
+OSReport
+OSReportVerbose
+OSReportInfo
+OSReportWarn
+OSVReport
+OSFatal
+__os_snprintf
+OSSavesDone_ReadyToRelease
+
+# Provided by the host libc, not by us. The linker resolves these against
+# newlib, whose semantics match and whose ARM64 implementations are better
+# than anything we would write. Counted as covered because they are.
+exit
+_Exit
+memcpy
+memmove
+memset

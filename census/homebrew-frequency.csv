@@ -11,11 +11,11 @@ coreinit,OSGetSystemInfo,functions,4,100.0,yes
 coreinit,OSGetTime,functions,4,100.0,yes
 coreinit,OSGetTitleID,functions,4,100.0,yes
 coreinit,OSLockMutex,functions,4,100.0,yes
-coreinit,OSSavesDone_ReadyToRelease,functions,4,100.0,no
+coreinit,OSSavesDone_ReadyToRelease,functions,4,100.0,yes
 coreinit,OSSetThreadCleanupCallback,functions,4,100.0,yes
 coreinit,OSSleepTicks,functions,4,100.0,yes
 coreinit,OSUnlockMutex,functions,4,100.0,yes
-coreinit,exit,functions,4,100.0,no
+coreinit,exit,functions,4,100.0,yes
 proc_ui,ProcUIInitEx,functions,4,100.0,no
 coreinit,DCFlushRange,functions,3,75.0,yes
 coreinit,DCStoreRange,functions,3,75.0,yes
@@ -31,7 +31,7 @@ coreinit,OSCancelAlarm,functions,3,75.0,no
 coreinit,OSCreateAlarm,functions,3,75.0,no
 coreinit,OSCreateThread,functions,3,75.0,yes
 coreinit,OSEnableHomeButtonMenu,functions,3,75.0,no
-coreinit,OSFatal,functions,3,75.0,no
+coreinit,OSFatal,functions,3,75.0,yes
 coreinit,OSGetAlarmUserData,functions,3,75.0,no
 coreinit,OSGetSystemTime,functions,3,75.0,yes
 coreinit,OSGetThreadAffinity,functions,3,75.0,no
@@ -43,7 +43,7 @@ coreinit,OSInitMutexEx,functions,3,75.0,yes
 coreinit,OSInitSemaphore,functions,3,75.0,no
 coreinit,OSInitSpinLock,functions,3,75.0,no
 coreinit,OSJoinThread,functions,3,75.0,yes
-coreinit,OSReport,functions,3,75.0,no
+coreinit,OSReport,functions,3,75.0,yes
 coreinit,OSResumeThread,functions,3,75.0,yes
 coreinit,OSScreenClearBufferEx,functions,3,75.0,no
 coreinit,OSScreenEnableEx,functions,3,75.0,no
@@ -65,7 +65,7 @@ coreinit,OSTryWaitSemaphore,functions,3,75.0,no
 coreinit,OSUninterruptibleSpinLock_Acquire,functions,3,75.0,no
 coreinit,OSUninterruptibleSpinLock_Release,functions,3,75.0,no
 coreinit,OSWaitCond,functions,3,75.0,yes
-coreinit,__os_snprintf,functions,3,75.0,no
+coreinit,__os_snprintf,functions,3,75.0,yes
 gx2,GX2CalcDRCSize,functions,3,75.0,no
 gx2,GX2CalcFetchShaderSizeEx,functions,3,75.0,no
 gx2,GX2CalcSurfaceSizeAndAlignment,functions,3,75.0,no
@@ -213,7 +213,7 @@ coreinit,OSScreenShutdown,functions,2,50.0,no
 coreinit,OSSetThreadName,functions,2,50.0,no
 coreinit,OSTryLockMutex,functions,2,50.0,yes
 coreinit,OSWaitSemaphore,functions,2,50.0,no
-coreinit,_Exit,functions,2,50.0,no
+coreinit,_Exit,functions,2,50.0,yes
 gx2,GX2ClearDepthStencilEx,functions,2,50.0,no
 gx2,GX2GetLastSubmittedTimeStamp,functions,2,50.0,no
 gx2,GX2GetRetiredTimeStamp,functions,2,50.0,no
@@ -366,7 +366,7 @@ coreinit,OSClearThreadStackUsage,functions,1,25.0,no
 coreinit,OSCompareAndSwapAtomic,functions,1,25.0,no
 coreinit,OSCompareAndSwapAtomic64,functions,1,25.0,no
 coreinit,OSCompareAndSwapAtomicEx64,functions,1,25.0,no
-coreinit,OSConsoleWrite,functions,1,25.0,no
+coreinit,OSConsoleWrite,functions,1,25.0,yes
 coreinit,OSContinueThread,functions,1,25.0,no
 coreinit,OSCreateAlarmEx,functions,1,25.0,no
 coreinit,OSDynLoad_Acquire,functions,1,25.0,no

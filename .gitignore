@@ -5,3 +5,4 @@ build/
 *.nso
 *.npdm
 *.pfs0
+census-out/
