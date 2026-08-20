@@ -95,3 +95,18 @@ OSSetThreadName
 OSGetThreadSpecific
 OSSetThreadSpecific
 OSSetThreadDeallocator
+
+# filesystem.cpp -- synchronous read-only subset
+FSInit
+FSShutdown
+FSAddClient
+FSDelClient
+FSGetClientNum
+FSInitCmdBlock
+FSOpenFile
+FSCloseFile
+FSReadFile
+FSReadFileWithPos
+FSGetPosFile
+FSSetPosFile
+FSGetStatFile

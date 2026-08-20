@@ -9,6 +9,7 @@
 #include "coreinit/debug.h"
 #include "coreinit/foreground.h"
 #include "coreinit/internal.h"
+#include "coreinit/filesystem.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -587,6 +588,64 @@ static void test_thread_specific()
     OSSetThreadSpecific(OS_THREAD_SPECIFIC_0, nullptr);
 }
 
+static void test_filesystem()
+{
+    const char *hostPath = "/switch/coreinit-nx-test.bin";
+    const char  payload[] = "CAFEBABE0123456789";
+    const uint32_t payloadLen = sizeof(payload) - 1;
+
+    FILE *seed = fopen(hostPath, "wb");
+    if (!seed) { check(false, "impossibile creare il file di prova"); return; }
+    fwrite(payload, 1, payloadLen, seed);
+    fclose(seed);
+
+    FSInit();
+    coreinitNxClearVolumeMappings();
+    coreinitNxAddVolumeMapping("/vol/content", "/switch");
+
+    static FSClient   client;
+    static FSCmdBlock block;
+    FSAddClient(&client, FS_ERROR_FLAG_ALL);
+    FSInitCmdBlock(&block);
+    check(FSGetClientNum() == 1, "FSAddClient registra la sessione");
+
+    FSFileHandle h = 0;
+    const FSStatus opened = FSOpenFile(&client, &block,
+                                       "/vol/content/coreinit-nx-test.bin",
+                                       "rb", &h, FS_ERROR_FLAG_ALL);
+    check(opened == FS_STATUS_OK && h != 0,
+          "FSOpenFile risolve il percorso /vol/ tramite la mappatura");
+
+    if (opened == FS_STATUS_OK) {
+        FSStat st;
+        FSGetStatFile(&client, &block, h, &st, FS_ERROR_FLAG_ALL);
+        check(st.size == payloadLen, "FSGetStatFile riporta la dimensione");
+
+        uint8_t buf[32] = {};
+        const FSStatus n = FSReadFile(&client, &block, buf, 1, 8, h, 0,
+                                      FS_ERROR_FLAG_ALL);
+        printf("  letti %d byte: %.8s\n", (int)n, buf);
+        check((int)n == 8 && memcmp(buf, payload, 8) == 0,
+              "FSReadFile restituisce il conteggio e i dati giusti");
+
+        uint32_t pos = 0;
+        FSGetPosFile(&client, &block, h, &pos, FS_ERROR_FLAG_ALL);
+        check(pos == 8, "la posizione avanza dopo la lettura");
+
+        FSSetPosFile(&client, &block, h, 4, FS_ERROR_FLAG_ALL);
+        uint8_t buf2[8] = {};
+        FSReadFile(&client, &block, buf2, 1, 4, h, 0, FS_ERROR_FLAG_ALL);
+        check(memcmp(buf2, payload + 4, 4) == 0,
+              "FSSetPosFile riposiziona correttamente");
+
+        FSCloseFile(&client, &block, h, FS_ERROR_FLAG_ALL);
+    }
+
+    FSDelClient(&client, FS_ERROR_FLAG_ALL);
+    FSShutdown();
+    remove(hostPath);
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -629,6 +688,7 @@ int main(int argc, char **argv)
     test_saves_done();
     test_thread_introspection();
     test_thread_specific();
+    test_filesystem();
 
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
