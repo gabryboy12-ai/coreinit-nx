@@ -5,10 +5,16 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
-> **Status: early.** Nine modules implemented, 37 tests passing on real
-> hardware. Measured coverage: **34.6%** of coreinit requirements across a
-> 4-title homebrew corpus and 1 original WiiU title. This is a foundation, 
-> not a finished runtime.
+> **Status: early but usable as a base.** Ten modules, 35 tests passing on
+> real hardware.
+>
+> | Corpus | coreinit symbols | Title requirements covered |
+> |---|---|---|
+> | Black Ops 2 (Wii U) | 66 / 162 | **40.7%** |
+> | Homebrew (4 titles) | 85 / 347 | **37.6%** |
+>
+> Coverage is measured, not estimated — see [the import census](#the-import-census).
+
 ---
 
 ## Why this exists
@@ -429,30 +435,29 @@ imported symbol names is factual metadata, not game content.
 
 ## Not implemented yet
 
-Ordered by measured frequency in the current corpus:
+Ordered by measured frequency. On Black Ops 2 the remaining 100% tier is:
 
-- [x] **Heaps** — `MEMAllocFromExpHeapEx`, `MEMFreeToExpHeap`,
-      `MEMCreateExpHeapEx`, `MEMAllocFromFrmHeapEx`,
-      `MEMRecordStateForFrmHeap`, `MEMFreeByStateToFrmHeap`,
-      `MEMGetBaseHeapHandle` and friends. Present in **100%** of the corpus.
-      Two distinct allocators: FrmHeap is a two-ended stack, ExpHeap is a
-      general-purpose allocator. This is the first module that requires
-      *implementing* rather than *mapping*: `MEMCreateExpHeapEx` receives a
-      region of guest memory and must suballocate it, because returned
-      pointers have to fall inside that region — games do arithmetic on them.
-- [ ] `OSSavesDone_ReadyToRelease` — 100%
-- [ ] Alarms — `OSCreateAlarm`, `OSCancelAlarm`, `OSGetAlarmUserData` — 75%
-- [x] Thread-local storage — `OSGetThreadSpecific`, `OSSetThreadSpecific`
-- [ ] `OSFastMutex_*` — a second, distinct mutex family
-- [ ] Semaphores — `OSInitSemaphore`
-- [ ] Spinlocks — `OSUninterruptibleSpinLock_*`
-- [ ] Filesystem — the `FSA*` family, 25 functions
-- [ ] `OSFatal`, thread introspection (`OSGetThreadPriority`,
-      `OSGetThreadAffinity`)
+- [ ] **`LC*`** — locked cache and DMA (10 functions). The Espresso's locked
+      cache has no ARM64 equivalent; this needs a design decision, not an
+      implementation.
+- [ ] **Mounting** — `FSMount`, `FSGetMountSource`, `FSGetVolumeState`,
+      `FSSetStateChangeNotification`. Removable media has no meaningful
+      equivalent here.
+- [ ] **64-bit atomics** — `OSAddAtomic64`, `OSAndAtomic64` and friends.
+      Straightforward on ARM64.
+- [ ] `MCP_Open`, `MCP_Close`, `MCP_GetSysProdSettings` — system
+      configuration.
+- [ ] `DCInvalidateRange`, `DCZeroRange`, `OSBlockMove`,
+      `ENVGetEnvironmentVariable`
 
-Graphics (`GX2`) is explicitly **out of scope** for this repository. 202
-distinct imports already appear in a 4-title corpus. It deserves its own
-project.
+On the homebrew corpus the remaining 75% tier is alarms, semaphores,
+uninterruptible spinlocks, `OSScreen` (8 functions), and the three
+`MEM*DefaultHeap` entries imported as **data** rather than functions —
+which needs a mechanism this project does not yet have.
+
+`OSScreen` is worth a note: it sits at 75% on homebrew and is **absent from
+Black Ops 2**. It is how homebrew draws; games draw through GX2. A useful
+illustration of why the two corpora are reported separately.
 
 ---
 
