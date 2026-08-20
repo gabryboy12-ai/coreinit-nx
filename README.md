@@ -5,8 +5,8 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
-> **Status: early.** Eight modules implemented, 36 tests passing on real
-> hardware. Measured coverage: **30.3%** of coreinit requirements across a
+> **Status: early.** Nine modules implemented, 37 tests passing on real
+> hardware. Measured coverage: **34.6%** of coreinit requirements across a
 > 4-title homebrew corpus and 1 original WiiU title. This is a foundation, 
 > not a finished runtime.
 ---
@@ -288,6 +288,71 @@ starts with them empty while the parent holds a value.
 
 **Not implemented:** changing priority or affinity of an already-running
 thread. Both are recorded and reported back, neither is applied.
+
+### `coreinit/filesystem.h` — synchronous read-only subset
+
+`FSInit`, `FSShutdown`, `FSAddClient`, `FSDelClient`, `FSGetClientNum`,
+`FSInitCmdBlock`, `FSOpenFile`, `FSCloseFile`, `FSReadFile`,
+`FSReadFileWithPos`, `FSGetPosFile`, `FSSetPosFile`, `FSGetStatFile`
+
+Cafe OS's file API carries three objects most POSIX programmers do not
+expect: an `FSClient` session (0x1700 bytes), an `FSCmdBlock` per-command
+context (0xA80 bytes) — the API was designed asynchronous — and an
+`FSErrorFlag` mask on nearly every call.
+
+Both structures are treated as opaque and never populated. `FSFileHandle`
+is a `uint32_t` rather than a pointer, so handles are minted here and map
+to host `FILE*` in a side table.
+
+**Path mapping is configurable, not hardcoded.** Wii U paths look like
+`/vol/content/...`; where that content lives on a Switch SD card is the
+port's decision. `coreinitNxAddVolumeMapping("/vol/content", "/wiiu/bo2")`
+registers a prefix translation, applied in one place.
+
+**Scope.** Only the synchronous read path. The `*Async` variants do not
+appear in the filtered census — games use this API synchronously despite
+its asynchronous design. Writing, directories and mounting are not
+implemented yet.
+
+**Verified on hardware, end to end:** a real file written to the SD card,
+opened through a `/vol/content/...` path, read back with correct bytes,
+seeked and re-read.
+
+**Assumed, NOT verified:** that `FSReadFile` returns the *number of items
+read* rather than `FS_STATUS_OK`. This is the Cafe OS convention — positive
+is a count, negative is an error — but it has not been confirmed against
+decaf-emu.
+
+### Filesystem — writing, directories, per-client state
+
+`FSWriteFile`, `FSChangeDir`, `FSGetCwd`, `FSOpenDir`, `FSReadDir`,
+`FSCloseDir`, `FSMakeDir`, `FSRemove`, `FSRename`, `FSGetLastError`,
+`FSGetLastErrorCodeForViewer`
+
+`FSChangeDir` forced the first real per-client state in the project: a
+relative path must resolve against *that client's* current directory, not a
+global one. `HostClient` now carries a working directory and the last error,
+keyed by the guest `FSClient` pointer.
+
+Note that `FS_STATUS_*` and `FS_ERROR_*` are distinct enums — the first is
+the call's outcome, the second the diagnostic code retrievable afterwards.
+`FSGetLastError` returns the latter, so operations map their status into it
+as they complete.
+
+`FSRemove` deletes both files and empty directories, matching Cafe OS.
+`FSReadDir` returns `FS_STATUS_END` at the end of a directory rather than an
+error.
+
+**Verified on hardware, end to end:** write a file, read it back byte for
+byte, change directory, open the same file by relative path, list the
+directory and find it, rename it, delete it, and confirm that opening a
+missing file leaves `FS_ERROR_NOT_FOUND` in the client's error state.
+
+**Still not implemented:** mounting and volume enumeration (`FSMount`,
+`FSGetMountSource`, `FSGetVolumeState`) and change notifications
+(`FSSetStateChangeNotification`). These concern removable media, which has
+no meaningful equivalent here; they will be documented stubs rather than
+fake implementations.
 
 ---
 

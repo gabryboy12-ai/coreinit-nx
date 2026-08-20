@@ -110,3 +110,16 @@ FSReadFileWithPos
 FSGetPosFile
 FSSetPosFile
 FSGetStatFile
+
+# filesystem.cpp -- write, directories, error state
+FSWriteFile
+FSChangeDir
+FSGetCwd
+FSOpenDir
+FSReadDir
+FSCloseDir
+FSMakeDir
+FSRemove
+FSRename
+FSGetLastError
+FSGetLastErrorCodeForViewer

@@ -5,6 +5,10 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <map>
+#include <unistd.h>
 
 namespace {
 
@@ -25,19 +29,71 @@ bool                  g_lockInit = false;
 struct Mapping { std::string wiiu, host; };
 std::vector<Mapping> g_mappings;
 
+// Stato per client. Finora non serviva -- FSChangeDir lo rende necessario,
+// perche' i percorsi relativi vanno risolti rispetto alla directory
+// corrente di QUEL client, non a una globale.
+struct HostClient {
+    std::string cwd;
+    FSError     lastError = FS_ERROR_OK;
+};
+std::map<const void *, HostClient> g_clientState;
+
+struct HostDir {
+    DIR *dp;
+    bool used;
+};
+std::vector<HostDir> g_dirs;
+
+// FS_STATUS_* e FS_ERROR_* sono due enum distinti: il primo e' l'esito
+// della chiamata, il secondo il codice diagnostico interrogabile dopo.
+FSError statusToError(FSStatus s) {
+    switch (s) {
+        case FS_STATUS_OK:               return FS_ERROR_OK;
+        case FS_STATUS_END:              return FS_ERROR_END_OF_FILE;
+        case FS_STATUS_NOT_FOUND:        return FS_ERROR_NOT_FOUND;
+        case FS_STATUS_EXISTS:           return FS_ERROR_ALREADY_EXISTS;
+        case FS_STATUS_PERMISSION_ERROR: return FS_ERROR_PERMISSION_ERROR;
+        case FS_STATUS_ACCESS_ERROR:     return FS_ERROR_ACCESS_ERROR;
+        case FS_STATUS_STORAGE_FULL:     return FS_ERROR_STORAGE_FULL;
+        default:                         return FS_ERROR_MEDIA_ERROR;
+    }
+}
+
+FSStatus record(const void *client, FSStatus s) {
+    if (client) g_clientState[client].lastError = statusToError(s);
+    return s;
+}
+
+HostDir *dirFor(FSDirectoryHandle h) {
+    if (h == 0 || h > g_dirs.size()) return nullptr;
+    HostDir *d = &g_dirs[h - 1];
+    return d->used ? d : nullptr;
+}
+
 void ensureLock() {
     if (!g_lockInit) { mutexInit(&g_lock); g_lockInit = true; }
 }
 
-std::string translate(const char *path) {
+std::string translate(const void *client, const char *path) {
     if (!path) return std::string();
     std::string p(path);
+
+    // Percorso relativo: risolvilo rispetto alla cwd del client.
+    if (!p.empty() && p[0] != '/') {
+        auto it = g_clientState.find(client);
+        if (it != g_clientState.end() && !it->second.cwd.empty()) {
+            std::string base = it->second.cwd;
+            if (base.back() != '/') base += '/';
+            p = base + p;
+        }
+    }
+
     for (const auto &m : g_mappings) {
         if (p.compare(0, m.wiiu.size(), m.wiiu) == 0) {
             return m.host + p.substr(m.wiiu.size());
         }
     }
-    return p;   // nessuna mappatura: percorso invariato
+    return p;
 }
 
 HostFile *fileFor(FSFileHandle h) {
@@ -81,6 +137,13 @@ void FSShutdown(void)
     g_clients = 0;
     g_init = false;
     mutexUnlock(&g_lock);
+    
+    for (auto &d : g_dirs) { 
+        if (d.used && d.dp) closedir(d.dp);
+    d.used = false; d.dp = nullptr; 
+    }
+    g_dirs.clear();
+    g_clientState.clear();
 }
 
 // FSClient e FSCmdBlock sono strutture del guest da 0x1700 e 0xA80 byte.
@@ -117,9 +180,9 @@ FSStatus FSOpenFile(FSClient *client, FSCmdBlock *block, const char *path,
 
     ensureLock();
     mutexLock(&g_lock);
-    const std::string hostPath = translate(path);
+    const std::string hostPath = translate(client,path);
     FILE *fp = fopen(hostPath.c_str(), mode);
-    if (!fp) { mutexUnlock(&g_lock); return FS_STATUS_NOT_FOUND; }
+        if (!fp) { mutexUnlock(&g_lock); return record(client, FS_STATUS_NOT_FOUND); }
 
     uint32_t slot = 0;
     for (uint32_t i = 0; i < g_files.size(); i++) {
@@ -131,6 +194,7 @@ FSStatus FSOpenFile(FSClient *client, FSCmdBlock *block, const char *path,
     g_files[slot - 1] = HostFile{fp, true};
     *handle = slot;
     mutexUnlock(&g_lock);
+    return record(client, FS_STATUS_OK);
     return FS_STATUS_OK;
 }
 
@@ -221,6 +285,145 @@ FSStatus FSGetStatFile(FSClient *client, FSCmdBlock *block,
     stat->size      = (uint32_t)end;
     stat->allocSize = (uint32_t)end;
     return FS_STATUS_OK;
+}
+
+FSStatus FSWriteFile(FSClient *client, FSCmdBlock *block, uint8_t *buffer,
+                     uint32_t size, uint32_t count, FSFileHandle handle,
+                     uint32_t unk1, FSErrorFlag errorMask)
+{
+    (void)client; (void)block; (void)unk1; (void)errorMask;
+    if (!buffer || size == 0) return FS_STATUS_FATAL_ERROR;
+    HostFile *f = fileFor(handle);
+    if (!f) return FS_STATUS_FATAL_ERROR;
+    // Come per la lettura: il ritorno e' il conteggio degli elementi.
+    return (FSStatus)(int32_t)fwrite(buffer, size, count, f->fp);
+}
+
+FSStatus FSChangeDir(FSClient *client, FSCmdBlock *block, const char *path,
+                     FSErrorFlag errorMask)
+{
+    (void)block; (void)errorMask;
+    if (!client || !path) return FS_STATUS_FATAL_ERROR;
+    ensureLock();
+    mutexLock(&g_lock);
+    g_clientState[client].cwd = path;
+    mutexUnlock(&g_lock);
+    return FS_STATUS_OK;
+}
+
+FSStatus FSGetCwd(FSClient *client, FSCmdBlock *block, char *returnedPath,
+                  uint32_t bytes, FSErrorFlag errorMask)
+{
+    (void)block; (void)errorMask;
+    if (!client || !returnedPath || bytes == 0) return FS_STATUS_FATAL_ERROR;
+    ensureLock();
+    mutexLock(&g_lock);
+    const std::string &cwd = g_clientState[client].cwd;
+    snprintf(returnedPath, bytes, "%s", cwd.c_str());
+    mutexUnlock(&g_lock);
+    return FS_STATUS_OK;
+}
+
+FSStatus FSOpenDir(FSClient *client, FSCmdBlock *block, const char *path,
+                   FSDirectoryHandle *handle, FSErrorFlag errorMask)
+{
+    (void)block; (void)errorMask;
+    if (!path || !handle) return FS_STATUS_FATAL_ERROR;
+
+    ensureLock();
+    mutexLock(&g_lock);
+    DIR *dp = opendir(translate(client, path).c_str());
+    if (!dp) { mutexUnlock(&g_lock); return record(client, FS_STATUS_NOT_FOUND); }
+
+    uint32_t slot = 0;
+    for (uint32_t i = 0; i < g_dirs.size(); i++) {
+        if (!g_dirs[i].used) { slot = i + 1; break; }
+    }
+    if (slot == 0) { g_dirs.push_back(HostDir{nullptr, false});
+                     slot = (uint32_t)g_dirs.size(); }
+
+    g_dirs[slot - 1] = HostDir{dp, true};
+    *handle = slot;
+    mutexUnlock(&g_lock);
+    return FS_STATUS_OK;
+}
+
+FSStatus FSReadDir(FSClient *client, FSCmdBlock *block,
+                   FSDirectoryHandle handle, FSDirectoryEntry *entry,
+                   FSErrorFlag errorMask)
+{
+    (void)client; (void)block; (void)errorMask;
+    if (!entry) return FS_STATUS_FATAL_ERROR;
+    HostDir *d = dirFor(handle);
+    if (!d) return FS_STATUS_FATAL_ERROR;
+
+    struct dirent *e = readdir(d->dp);
+    // Fine directory: Cafe OS segnala FS_STATUS_END, non un errore.
+    if (!e) return FS_STATUS_END;
+
+    memset(entry, 0, sizeof(*entry));
+    snprintf(entry->name, sizeof(entry->name), "%s", e->d_name);
+    return FS_STATUS_OK;
+}
+
+FSStatus FSCloseDir(FSClient *client, FSCmdBlock *block,
+                    FSDirectoryHandle handle, FSErrorFlag errorMask)
+{
+    (void)client; (void)block; (void)errorMask;
+    ensureLock();
+    mutexLock(&g_lock);
+    HostDir *d = dirFor(handle);
+    if (!d) { mutexUnlock(&g_lock); return FS_STATUS_FATAL_ERROR; }
+    if (d->dp) closedir(d->dp);
+    d->dp = nullptr; d->used = false;
+    mutexUnlock(&g_lock);
+    return FS_STATUS_OK;
+}
+
+FSStatus FSMakeDir(FSClient *client, FSCmdBlock *block, const char *path,
+                   FSErrorFlag errorMask)
+{
+    (void)block; (void)errorMask;
+    if (!path) return FS_STATUS_FATAL_ERROR;
+    const std::string host = translate(client, path);
+    if (mkdir(host.c_str(), 0777) != 0) return FS_STATUS_FATAL_ERROR;
+    return FS_STATUS_OK;
+}
+
+FSStatus FSRemove(FSClient *client, FSCmdBlock *block, const char *path,
+                  FSErrorFlag errorMask)
+{
+    (void)block; (void)errorMask;
+    if (!path) return FS_STATUS_FATAL_ERROR;
+    const std::string host = translate(client, path);
+    // Cafe OS: FSRemove cancella sia file che directory vuote.
+    if (remove(host.c_str()) == 0) return record(client, FS_STATUS_OK);
+    if (rmdir(host.c_str()) == 0)  return record(client, FS_STATUS_OK);
+    return record(client, FS_STATUS_NOT_FOUND);
+}
+
+FSStatus FSRename(FSClient *client, FSCmdBlock *block, const char *oldPath,
+                  const char *newPath, FSErrorFlag errorMask)
+{
+    (void)block; (void)errorMask;
+    if (!oldPath || !newPath) return FS_STATUS_FATAL_ERROR;
+    const std::string a = translate(client, oldPath);
+    const std::string b = translate(client, newPath);
+    return record(client, rename(a.c_str(), b.c_str()) == 0
+                              ? FS_STATUS_OK
+                              : FS_STATUS_FATAL_ERROR);
+}
+
+FSError FSGetLastError(FSClient *client)
+{
+    if (!client) return FS_ERROR_INVALID_CLIENTHANDLE;
+    auto it = g_clientState.find(client);
+    return it == g_clientState.end() ? FS_ERROR_OK : it->second.lastError;
+}
+
+FSError FSGetLastErrorCodeForViewer(FSClient *client)
+{
+    return FSGetLastError(client);
 }
 
 } // extern "C"

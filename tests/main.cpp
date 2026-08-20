@@ -646,6 +646,95 @@ static void test_filesystem()
     remove(hostPath);
 }
 
+static void test_filesystem_write_and_dirs()
+{
+    FSInit();
+    coreinitNxClearVolumeMappings();
+    coreinitNxAddVolumeMapping("/vol/save", "/switch");
+
+    static FSClient   client;
+    static FSCmdBlock block;
+    FSAddClient(&client, FS_ERROR_FLAG_ALL);
+    FSInitCmdBlock(&block);
+
+    // Scrittura
+    FSFileHandle h = 0;
+    const char payload[] = "written-by-coreinit-nx";
+    if (FSOpenFile(&client, &block, "/vol/save/cnx-write.bin", "wb", &h,
+                   FS_ERROR_FLAG_ALL) == FS_STATUS_OK) {
+        const FSStatus n = FSWriteFile(&client, &block, (uint8_t *)payload,
+                                       1, sizeof(payload) - 1, h, 0,
+                                       FS_ERROR_FLAG_ALL);
+        FSCloseFile(&client, &block, h, FS_ERROR_FLAG_ALL);
+        check((int)n == (int)sizeof(payload) - 1,
+              "FSWriteFile scrive e riporta il conteggio");
+    } else {
+        check(false, "FSOpenFile in scrittura");
+    }
+
+    // Rilettura di quanto scritto
+    uint8_t back[32] = {};
+    if (FSOpenFile(&client, &block, "/vol/save/cnx-write.bin", "rb", &h,
+                   FS_ERROR_FLAG_ALL) == FS_STATUS_OK) {
+        FSReadFile(&client, &block, back, 1, sizeof(payload) - 1, h, 0,
+                   FS_ERROR_FLAG_ALL);
+        FSCloseFile(&client, &block, h, FS_ERROR_FLAG_ALL);
+    }
+    check(memcmp(back, payload, sizeof(payload) - 1) == 0,
+          "quanto scritto si rilegge identico");
+
+    // Percorso relativo tramite FSChangeDir
+    FSChangeDir(&client, &block, "/vol/save", FS_ERROR_FLAG_ALL);
+    char cwd[64] = {};
+    FSGetCwd(&client, &block, cwd, sizeof(cwd), FS_ERROR_FLAG_ALL);
+    check(strcmp(cwd, "/vol/save") == 0, "FSGetCwd riporta la directory impostata");
+
+    FSFileHandle rel = 0;
+    const FSStatus relOpen = FSOpenFile(&client, &block, "cnx-write.bin",
+                                        "rb", &rel, FS_ERROR_FLAG_ALL);
+    check(relOpen == FS_STATUS_OK,
+          "un percorso relativo si risolve rispetto alla cwd");
+    if (relOpen == FS_STATUS_OK) FSCloseFile(&client, &block, rel, FS_ERROR_FLAG_ALL);
+
+    // Directory
+    FSDirectoryHandle dh = 0;
+    const FSStatus dirOpen = FSOpenDir(&client, &block, "/vol/save", &dh,
+                                       FS_ERROR_FLAG_ALL);
+    bool foundOurFile = false;
+    if (dirOpen == FS_STATUS_OK) {
+        FSDirectoryEntry e;
+        while (FSReadDir(&client, &block, dh, &e, FS_ERROR_FLAG_ALL)
+               == FS_STATUS_OK) {
+            if (strcmp(e.name, "cnx-write.bin") == 0) foundOurFile = true;
+        }
+        FSCloseDir(&client, &block, dh, FS_ERROR_FLAG_ALL);
+    }
+    check(dirOpen == FS_STATUS_OK && foundOurFile,
+          "FSOpenDir/FSReadDir elencano il file appena creato");
+
+    // Rename e remove
+    FSRename(&client, &block, "/vol/save/cnx-write.bin",
+             "/vol/save/cnx-renamed.bin", FS_ERROR_FLAG_ALL);
+    FSFileHandle r = 0;
+    const bool renamed = FSOpenFile(&client, &block, "/vol/save/cnx-renamed.bin",
+                                    "rb", &r, FS_ERROR_FLAG_ALL) == FS_STATUS_OK;
+    if (renamed) FSCloseFile(&client, &block, r, FS_ERROR_FLAG_ALL);
+    check(renamed, "FSRename sposta il file");
+
+    check(FSRemove(&client, &block, "/vol/save/cnx-renamed.bin",
+                   FS_ERROR_FLAG_ALL) == FS_STATUS_OK,
+          "FSRemove cancella il file");
+
+        FSFileHandle miss = 0;
+    FSOpenFile(&client, &block, "/vol/save/non-esiste-affatto.bin", "rb",
+               &miss, FS_ERROR_FLAG_ALL);
+    check(FSGetLastError(&client) == FS_ERROR_NOT_FOUND,
+          "FSGetLastError riporta l'ultimo errore del client");
+
+    FSDelClient(&client, FS_ERROR_FLAG_ALL);
+    FSShutdown();
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -689,6 +778,7 @@ int main(int argc, char **argv)
     test_thread_introspection();
     test_thread_specific();
     test_filesystem();
+    test_filesystem_write_and_dirs();
 
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
