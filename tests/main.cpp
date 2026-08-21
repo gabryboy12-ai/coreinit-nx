@@ -10,6 +10,7 @@
 #include "coreinit/foreground.h"
 #include "coreinit/internal.h"
 #include "coreinit/filesystem.h"
+#include "coreinit/atomic64.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -735,6 +736,100 @@ static void test_filesystem_write_and_dirs()
     FSShutdown();
 }
 
+static volatile uint64_t s_atomicCounter;
+
+static int atomic_worker(int argc, const char **argv)
+{
+    (void)argc; (void)argv;
+    for (int i = 0; i < 10000; i++) OSAddAtomic64((volatile int64_t *)&s_atomicCounter, 1);
+    return 0;
+}
+
+static void test_atomic64()
+{
+    uint64_t v = 0;
+    OSSetAtomic64(&v, 0x1122334455667788ull);
+    check(OSGetAtomic64(&v) == 0x1122334455667788ull,
+          "OSSetAtomic64/OSGetAtomic64 a 64 bit pieni");
+
+    check(OSCompareAndSwapAtomic64(&v, 0x1122334455667788ull, 42) == 1 && v == 42,
+          "compare-and-swap riuscito");
+    check(OSCompareAndSwapAtomic64(&v, 999, 7) == 0 && v == 42,
+          "compare-and-swap fallito non modifica");
+
+    v = 0;
+    check(OSTestAndSetAtomic64(&v, 40) == 0 && v == (1ull << 40),
+          "test-and-set riporta il bit precedente e lo imposta");
+    check(OSTestAndClearAtomic64(&v, 40) == 1 && v == 0,
+          "test-and-clear riporta il bit precedente e lo azzera");
+
+    // Il test vero: due thread che incrementano lo stesso contatore.
+    // Senza atomicita' reale il totale sarebbe minore di 20000.
+    s_atomicCounter = 0;
+    static OSThread a, b;
+    static uint8_t sa[0x4000], sb[0x4000];
+
+    OSCreateThread(&a, atomic_worker, 0, nullptr, sa + sizeof(sa), sizeof(sa),
+                   16, OS_THREAD_ATTRIB_AFFINITY_ANY);
+    OSCreateThread(&b, atomic_worker, 0, nullptr, sb + sizeof(sb), sizeof(sb),
+                   16, OS_THREAD_ATTRIB_AFFINITY_ANY);
+    OSResumeThread(&a);
+    OSResumeThread(&b);
+    int r = 0;
+    OSJoinThread(&a, &r);
+    OSJoinThread(&b, &r);
+
+    printf("  contatore finale: %llu\n", (unsigned long long)s_atomicCounter);
+    check(s_atomicCounter == 20000,
+          "20000 incrementi da due thread senza perdite");
+}
+
+static void test_filesystem_mount()
+{
+    FSInit();
+    coreinitNxClearVolumeMappings();
+
+    static FSClient   client;
+    static FSCmdBlock block;
+    FSAddClient(&client, FS_ERROR_FLAG_ALL);
+    FSInitCmdBlock(&block);
+
+    check(FSGetVolumeState(&client) == FS_VOLUME_STATE_READY,
+          "il volume si dichiara pronto");
+
+    FSMountSource src;
+    check(FSGetMountSource(&client, &block, FS_MOUNT_SOURCE_SD, &src,
+                           FS_ERROR_FLAG_ALL) == FS_STATUS_OK,
+          "FSGetMountSource riporta una sorgente SD");
+
+    check(FSMount(&client, &block, &src, "/vol/external01", 0,
+                  FS_ERROR_FLAG_ALL) == FS_STATUS_OK,
+          "FSMount registra il punto di montaggio");
+
+    // La prova che il mount fa qualcosa: un percorso sotto il punto
+    // montato deve ora risolversi sul filesystem host.
+        // Prova concreta che il mount traduce: creiamo un file sull'host e lo
+    // apriamo attraverso il percorso montato.
+    FILE *seed = fopen("/switch/cnx-mount.bin", "wb");
+    if (seed) { fputs("mounted", seed); fclose(seed); }
+
+    FSFileHandle h = 0;
+    const FSStatus opened = FSOpenFile(&client, &block,
+                                       "/vol/external01/switch/cnx-mount.bin",
+                                       "rb", &h, FS_ERROR_FLAG_ALL);
+    check(opened == FS_STATUS_OK,
+          "un file sotto il mount si apre davvero");
+    if (opened == FS_STATUS_OK) FSCloseFile(&client, &block, h, FS_ERROR_FLAG_ALL);
+
+    // E la directory deve dare NOT_FILE, non NOT_FOUND.
+    FSFileHandle d = 0;
+    check(FSOpenFile(&client, &block, "/vol/external01/switch", "rb", &d,
+                     FS_ERROR_FLAG_ALL) == FS_STATUS_NOT_FILE,
+          "aprire una directory come file da NOT_FILE");
+
+    remove("/switch/cnx-mount.bin");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -779,7 +874,8 @@ int main(int argc, char **argv)
     test_thread_specific();
     test_filesystem();
     test_filesystem_write_and_dirs();
-
+    test_atomic64();
+    test_filesystem_mount();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);

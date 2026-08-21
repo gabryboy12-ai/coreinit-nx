@@ -360,6 +360,48 @@ missing file leaves `FS_ERROR_NOT_FOUND` in the client's error state.
 no meaningful equivalent here; they will be documented stubs rather than
 fake implementations.
 
+### `coreinit/atomic64.h`
+
+`OSGetAtomic64`, `OSSetAtomic64`, `OSSwapAtomic64`,
+`OSCompareAndSwapAtomic64`, `OSAddAtomic64`, `OSAndAtomic64`,
+`OSOrAtomic64`, `OSXorAtomic64`, `OSTestAndSetAtomic64`,
+`OSTestAndClearAtomic64`
+
+Implemented with compiler intrinsics (`__atomic_*`, `__ATOMIC_SEQ_CST`),
+not locks: GCC emits native ARM64 atomics directly. Wrapping these in a
+mutex would be an order of magnitude slower and would deadlock if a game
+used them from an interrupt-like context. Sequential consistency matches
+the PowerPC `sync`/`lwarx`-`stwcx` pairs Cafe OS builds these from, which
+are full barriers.
+
+**Verified on hardware:** two threads performing 10,000 increments each on
+a shared counter end at exactly 20,000 — a non-atomic implementation would
+lose increments.
+
+**Assumed, NOT verified:** which functions return the *previous* value and
+which return the *new* one. `OSAddAtomic64` is implemented as returning the
+new value, `OSSetAtomic64` and the test-and-* pair as returning the old,
+following the Revolution SDK convention. Getting these backwards would not
+fail any test here — it would silently corrupt a game's counters.
+
+### Filesystem — mounting
+
+`FSMount`, `FSGetMountSource`, `FSGetVolumeState`,
+`FSSetStateChangeNotification`
+
+`FSMount` is **not a stub**: it registers a volume mapping. Mounting an SD
+source on `/vol/external01` makes paths under that prefix resolve on the
+host filesystem, so paths the game constructs afterwards actually work.
+This costs no more code than a stub and is considerably more useful.
+
+`FSGetVolumeState` always reports `READY`, and state-change notifications
+are never fired. There is no removable media here, so nothing can change —
+that is the correct behaviour for this environment, not a pretence.
+
+`FSOpenFile` now distinguishes `FS_STATUS_NOT_FILE` from
+`FS_STATUS_NOT_FOUND` by stat-ing the path on failure. Games can branch on
+the difference.
+
 ---
 
 ## The import census

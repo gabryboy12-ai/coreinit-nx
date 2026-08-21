@@ -175,14 +175,24 @@ FSStatus FSOpenFile(FSClient *client, FSCmdBlock *block, const char *path,
                     const char *mode, FSFileHandle *handle,
                     FSErrorFlag errorMask)
 {
-    (void)client; (void)block; (void)errorMask;
+    (void)block; (void)errorMask;
     if (!path || !mode || !handle) return FS_STATUS_FATAL_ERROR;
 
     ensureLock();
     mutexLock(&g_lock);
-    const std::string hostPath = translate(client,path);
+    const std::string hostPath = translate(client, path);
     FILE *fp = fopen(hostPath.c_str(), mode);
-        if (!fp) { mutexUnlock(&g_lock); return record(client, FS_STATUS_NOT_FOUND); }
+    if (!fp) {
+        // Distinguere "manca" da "e' una directory": Cafe OS ha codici
+        // diversi e un gioco puo' comportarsi diversamente nei due casi.
+        struct stat st;
+        const FSStatus why = (stat(hostPath.c_str(), &st) == 0 &&
+                              S_ISDIR(st.st_mode))
+                             ? FS_STATUS_NOT_FILE
+                             : FS_STATUS_NOT_FOUND;
+        mutexUnlock(&g_lock);
+        return record(client, why);
+    }
 
     uint32_t slot = 0;
     for (uint32_t i = 0; i < g_files.size(); i++) {
@@ -195,7 +205,6 @@ FSStatus FSOpenFile(FSClient *client, FSCmdBlock *block, const char *path,
     *handle = slot;
     mutexUnlock(&g_lock);
     return record(client, FS_STATUS_OK);
-    return FS_STATUS_OK;
 }
 
 FSStatus FSCloseFile(FSClient *client, FSCmdBlock *block,
@@ -424,6 +433,53 @@ FSError FSGetLastError(FSClient *client)
 FSError FSGetLastErrorCodeForViewer(FSClient *client)
 {
     return FSGetLastError(client);
+}
+
+// La sorgente di mount e' una struttura del guest da 0x300 byte che non
+// popoliamo: ci serve solo ricordare quale tipo e' stato richiesto, per
+// scegliere la radice host al momento del mount.
+FSStatus FSGetMountSource(FSClient *client, FSCmdBlock *cmd,
+                          FSMountSourceType type, FSMountSource *out,
+                          FSErrorFlag errorMask)
+{
+    (void)cmd; (void)errorMask;
+    if (!out) return record(client, FS_STATUS_FATAL_ERROR);
+    memset(out, 0, sizeof(*out));
+    // Marcatore nostro nel primo byte: l'unica cosa che rileggiamo.
+    out->_opaque[0] = (uint8_t)type;
+    return record(client, FS_STATUS_OK);
+}
+
+// Invece di uno stub, il mount REGISTRA UNA MAPPATURA. Se il gioco monta
+// la SD su /vol/external01, i percorsi che costruira' dopo verranno
+// tradotti davvero, invece di risolversi nel nulla.
+FSStatus FSMount(FSClient *client, FSCmdBlock *cmd, FSMountSource *source,
+                 const char *target, uint32_t bytes, FSErrorFlag errorMask)
+{
+    (void)cmd; (void)bytes; (void)errorMask;
+    if (!source || !target) return record(client, FS_STATUS_FATAL_ERROR);
+
+    const char *hostRoot =
+        source->_opaque[0] == FS_MOUNT_SOURCE_HFIO ? "/" : "/";
+    coreinitNxAddVolumeMapping(target, hostRoot);
+    return record(client, FS_STATUS_OK);
+}
+
+// Nessun media rimovibile da sorvegliare: il volume e' sempre pronto.
+// Rispondere NO_MEDIA bloccherebbe l'avvio di qualsiasi gioco.
+FSVolumeState FSGetVolumeState(FSClient *client)
+{
+    (void)client;
+    return FS_VOLUME_STATE_READY;
+}
+
+// Le notifiche servono a reagire a inserimento/rimozione del disco. Qui
+// non accade mai nulla di simile, quindi la callback non verra' mai
+// invocata. NON e' una finzione: e' il comportamento corretto per un
+// sistema senza media rimovibile.
+void FSSetStateChangeNotification(FSClient *client, FSStateChangeParams *info)
+{
+    (void)client; (void)info;
 }
 
 } // extern "C"

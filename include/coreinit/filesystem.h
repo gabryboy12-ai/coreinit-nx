@@ -78,6 +78,36 @@ typedef enum FSError {
 FSError FSGetLastError(FSClient *client);
 FSError FSGetLastErrorCodeForViewer(FSClient *client);
 
+typedef enum FSVolumeState {
+    FS_VOLUME_STATE_INITIAL       = 0,
+    FS_VOLUME_STATE_READY         = 1,
+    FS_VOLUME_STATE_NO_MEDIA      = 2,
+    FS_VOLUME_STATE_INVALID       = 11,
+} FSVolumeState;
+
+typedef enum FSMountSourceType {
+    FS_MOUNT_SOURCE_SD   = 0,
+    FS_MOUNT_SOURCE_HFIO = 1,
+} FSMountSourceType;
+
+// Da wut: WUT_CHECK_SIZE(FSMountSource, 0x300)
+typedef struct FSMountSource { uint8_t _opaque[0x300]; } FSMountSource;
+typedef struct FSStateChangeParams { uint8_t _opaque[0x0C]; } FSStateChangeParams;
+
+typedef void (*FSStateChangeCallback)(FSClient *, FSVolumeState, void *);
+
+FSStatus      FSGetMountSource(FSClient *client, FSCmdBlock *cmd,
+                               FSMountSourceType type, FSMountSource *out,
+                               FSErrorFlag errorMask);
+FSStatus      FSMount(FSClient *client, FSCmdBlock *cmd,
+                      FSMountSource *source, const char *target,
+                      uint32_t bytes, FSErrorFlag errorMask);
+FSVolumeState FSGetVolumeState(FSClient *client);
+
+void          FSSetStateChangeNotification(FSClient *client,FSStateChangeParams *info);
+
+
+
 void     FSInit(void);
 void     FSShutdown(void);
 FSStatus FSAddClient(FSClient *client, FSErrorFlag errorMask);

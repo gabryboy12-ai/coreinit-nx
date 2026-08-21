@@ -123,3 +123,21 @@ FSRemove
 FSRename
 FSGetLastError
 FSGetLastErrorCodeForViewer
+
+# atomic64.cpp
+OSGetAtomic64
+OSSetAtomic64
+OSCompareAndSwapAtomic64
+OSSwapAtomic64
+OSAddAtomic64
+OSAndAtomic64
+OSOrAtomic64
+OSXorAtomic64
+OSTestAndClearAtomic64
+OSTestAndSetAtomic64
+
+# filesystem.cpp -- mounting
+FSGetMountSource
+FSMount
+FSGetVolumeState
+FSSetStateChangeNotification
