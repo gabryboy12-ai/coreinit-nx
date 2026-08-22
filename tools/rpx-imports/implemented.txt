@@ -168,3 +168,22 @@ LCGetDMAQueueLength
 LCLoadDMABlocks
 LCStoreDMABlocks
 LCWaitDMAQueue
+
+# semaphore.cpp
+OSInitSemaphore
+OSInitSemaphoreEx
+OSGetSemaphoreCount
+OSSignalSemaphore
+OSWaitSemaphore
+OSTryWaitSemaphore
+
+# spinlock.cpp
+OSInitSpinLock
+OSAcquireSpinLock
+OSTryAcquireSpinLock
+OSTryAcquireSpinLockWithTimeout
+OSReleaseSpinLock
+OSUninterruptibleSpinLock_Acquire
+OSUninterruptibleSpinLock_TryAcquire
+OSUninterruptibleSpinLock_TryAcquireWithTimeout
+OSUninterruptibleSpinLock_Release

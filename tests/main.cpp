@@ -13,6 +13,8 @@
 #include "coreinit/atomic64.h"
 #include "coreinit/alarm.h"
 #include "coreinit/lockedcache.h"
+#include "coreinit/semaphore.h"
+#include "coreinit/spinlock.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -987,6 +989,83 @@ static void test_locked_cache()
           "LCDealloc restituisce lo spazio");
 }
 
+static OSSemaphore s_sem;
+static volatile int s_semWorkDone;
+
+static int sem_worker(int argc, const char **argv)
+{
+    (void)argc; (void)argv;
+    OSWaitSemaphore(&s_sem);      // blocca finche' il main non segnala
+    s_semWorkDone = 1;
+    return 0;
+}
+
+static void test_semaphore()
+{
+    OSInitSemaphore(&s_sem, 0);
+    check(OSGetSemaphoreCount(&s_sem) == 0, "il semaforo parte a zero");
+
+    check(OSTryWaitSemaphore(&s_sem) <= 0,
+          "trywait fallisce quando il conteggio e' zero");
+
+    s_semWorkDone = 0;
+    static OSThread t;
+    static uint8_t stack[0x4000];
+    OSCreateThread(&t, sem_worker, 0, nullptr, stack + sizeof(stack),
+                   sizeof(stack), 16, OS_THREAD_ATTRIB_AFFINITY_ANY);
+    OSResumeThread(&t);
+
+    svcSleepThread(80000000ULL);
+    check(s_semWorkDone == 0, "il worker resta bloccato sul semaforo");
+
+    check(OSSignalSemaphore(&s_sem) == 0,
+          "signal riporta il conteggio precedente");
+
+    int r = 0;
+    OSJoinThread(&t, &r);
+    check(s_semWorkDone == 1, "il worker riparte dopo il signal");
+    check(OSGetSemaphoreCount(&s_sem) == 0,
+          "il conteggio torna a zero dopo la wait");
+}
+
+static OSSpinLock s_spin;
+static volatile int s_spinCounter;
+
+static int spin_worker(int argc, const char **argv)
+{
+    (void)argc; (void)argv;
+    for (int i = 0; i < 5000; i++) {
+        OSUninterruptibleSpinLock_Acquire(&s_spin);
+        s_spinCounter++;
+        OSUninterruptibleSpinLock_Release(&s_spin);
+    }
+    return 0;
+}
+
+static void test_spinlock()
+{
+    OSInitSpinLock(&s_spin);
+    check(OSTryAcquireSpinLock(&s_spin) == 1, "trylock su spinlock libero");
+    OSReleaseSpinLock(&s_spin);
+
+    s_spinCounter = 0;
+    static OSThread a, b;
+    static uint8_t sa[0x4000], sb[0x4000];
+    OSCreateThread(&a, spin_worker, 0, nullptr, sa + sizeof(sa), sizeof(sa),
+                   16, OS_THREAD_ATTRIB_AFFINITY_ANY);
+    OSCreateThread(&b, spin_worker, 0, nullptr, sb + sizeof(sb), sizeof(sb),
+                   16, OS_THREAD_ATTRIB_AFFINITY_ANY);
+    OSResumeThread(&a);
+    OSResumeThread(&b);
+    int r = 0;
+    OSJoinThread(&a, &r);
+    OSJoinThread(&b, &r);
+
+    printf("  contatore protetto: %d\n", s_spinCounter);
+    check(s_spinCounter == 10000,
+          "lo spinlock protegge davvero la sezione critica");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -1039,6 +1118,8 @@ int main(int argc, char **argv)
     test_alarm_time_convention();
     test_alarm_shutdown();
     test_locked_cache();
+    test_semaphore();
+    test_spinlock();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);
