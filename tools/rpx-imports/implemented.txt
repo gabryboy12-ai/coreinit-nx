@@ -229,3 +229,13 @@ OSIsDebuggerPresent
 OSIsDebuggerInitialized
 OSPanic
 OSMemoryBarrier
+
+# dynload.cpp
+OSDynLoad_Acquire
+OSDynLoad_FindExport
+OSDynLoad_Release
+OSDynLoad_SetAllocator
+OSDynLoad_Error
+OSDynLoad_GetAllocator
+OSDynLoad_GetNumberOfRPLs
+OSDynLoad_GetRPLInfo

@@ -18,6 +18,7 @@
 #include "coreinit/memory.h"
 #include "coreinit/event.h"
 #include "coreinit/messagequeue.h"
+#include "coreinit/dynload.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -1211,6 +1212,47 @@ static void test_message_queue()
           "la coda di sistema esiste");
 }
 
+static void test_dynload()
+{
+    OSDynLoad_Module mod = nullptr;
+    check(OSDynLoad_Acquire("coreinit", &mod) == OS_DYNLOAD_OK && mod,
+          "OSDynLoad_Acquire trova coreinit");
+
+    void *addr = nullptr;
+    check(OSDynLoad_FindExport(mod, OS_DYNLOAD_EXPORT_FUNC, "OSGetTime",
+                               &addr) == OS_DYNLOAD_OK &&
+          addr == (void *)(uintptr_t)&OSGetTime,
+          "FindExport restituisce l'indirizzo reale della funzione");
+
+    // La prova che serve: chiamare attraverso il puntatore risolto.
+    typedef OSTime (*GetTimeFn)(void);
+    GetTimeFn fn = (GetTimeFn)addr;
+    const OSTime viaPointer = fn();
+    check(viaPointer > 0, "la funzione risolta e' davvero chiamabile");
+
+    check(OSDynLoad_FindExport(mod, OS_DYNLOAD_EXPORT_FUNC,
+                               "OSFunzioneCheNonEsiste", &addr)
+          == OS_DYNLOAD_MODULE_NOT_FOUND,
+          "un simbolo inesistente fallisce pulito");
+
+    // Il suffisso .rpl deve essere tollerato.
+    OSDynLoad_Module mod2 = nullptr;
+    check(OSDynLoad_Acquire("coreinit.rpl", &mod2) == OS_DYNLOAD_OK &&
+          mod2 == mod,
+          "il suffisso .rpl e' accettato e restituisce lo stesso modulo");
+
+    OSDynLoad_Release(mod2);
+    OSDynLoad_Release(mod);
+
+    OSDynLoad_Module missing = nullptr;
+    check(OSDynLoad_Acquire("nonesiste", &missing)
+          == OS_DYNLOAD_MODULE_NOT_FOUND,
+          "un modulo non implementato fallisce invece di mentire");
+
+    check(OSDynLoad_GetNumberOfRPLs() == 0,
+          "GetNumberOfRPLs riporta 0 come su console retail");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -1270,6 +1312,7 @@ int main(int argc, char **argv)
     test_event_manual();
     test_event_timeout();
     test_message_queue();
+    test_dynload();
 
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
