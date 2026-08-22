@@ -105,4 +105,23 @@ void OSSavesDone_ReadyToRelease(void)
 {
 }
 
+// Nessun debugger Cafe OS qui. Rispondere falso e' l'unica risposta
+// onesta, e i giochi la usano solo per abilitare logging extra.
+int32_t OSIsDebuggerPresent(void)     { return 0; }
+int32_t OSIsDebuggerInitialized(void) { return 0; }
+
+// OSPanic e' OSFatal con file e riga: stesso percorso.
+void OSPanic(const char *file, uint32_t line, const char *fmt, ...)
+{
+    char buf[512];
+    va_list args; va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt ? fmt : "", args);
+    va_end(args);
+
+    char full[640];
+    snprintf(full, sizeof(full), "%s:%lu: %s",
+             file ? file : "?", (unsigned long)line, buf);
+    OSFatal(full);
+}
+
 } // extern "C"

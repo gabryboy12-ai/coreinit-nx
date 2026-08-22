@@ -13,6 +13,9 @@ void OSReportInfo(const char *fmt, ...);
 void OSReportWarn(const char *fmt, ...);
 void OSVReport(const char *fmt, va_list args);
 void OSFatal(const char *msg);
+int32_t OSIsDebuggerPresent(void);
+int32_t OSIsDebuggerInitialized(void);
+void    OSPanic(const char *file, uint32_t line, const char *fmt, ...);
 
 // --- coreinit-nx extensions, not part of Cafe OS ---
 

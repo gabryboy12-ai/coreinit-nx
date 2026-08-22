@@ -324,4 +324,10 @@ uint32_t OSGetStackPointer(void)
 // processo. Qui la terminazione la gestisce Horizon: no-op documentata.
 void OSBlockThreadsOnExit(void) {}
 
+int32_t OSIsThreadTerminated(OSThread *thread)
+{
+    auto *h = g_threads.get(thread);
+    return (h->created && !h->started) ? 1 : 0;
+}
+
 } // extern "C"

@@ -154,7 +154,7 @@ OSSetAlarmUserData
 OSGetAlarmUserData
 OSWaitAlarm
 
-#LC 
+# lockedcache.cpp 
 LCHardwareIsAvailable
 LCAlloc
 LCDealloc
@@ -205,3 +205,27 @@ OSSetThreadCancelState
 OSDetachThread
 OSGetStackPointer
 OSBlockThreadsOnExit
+
+# event.cpp
+OSInitEvent
+OSInitEventEx
+OSSignalEvent
+OSSignalEventAll
+OSWaitEvent
+OSWaitEventWithTimeout
+OSResetEvent
+
+# messagequeue.cpp
+OSInitMessageQueue
+OSInitMessageQueueEx
+OSSendMessage
+OSReceiveMessage
+OSPeekMessage
+OSGetSystemMessageQueue
+
+# sparse
+OSIsThreadTerminated
+OSIsDebuggerPresent
+OSIsDebuggerInitialized
+OSPanic
+OSMemoryBarrier

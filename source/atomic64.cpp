@@ -71,4 +71,10 @@ int32_t OSTestAndSetAtomic64(volatile uint64_t *ptr, uint32_t bit)
     return (previous & mask) ? 1 : 0;
 }
 
+// Barriera piena, equivalente al 'sync' di PowerPC.
+void OSMemoryBarrier(void)
+{
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+}
+
 } // extern "C"

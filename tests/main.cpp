@@ -16,6 +16,8 @@
 #include "coreinit/semaphore.h"
 #include "coreinit/spinlock.h"
 #include "coreinit/memory.h"
+#include "coreinit/event.h"
+#include "coreinit/messagequeue.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -1130,6 +1132,85 @@ static void test_cache_and_block_ops()
     check(dst[0] == 0x5A, "le operazioni di cache non corrompono i dati");
 }
 
+static OSEvent s_event;
+static volatile int s_eventSeen;
+
+static int event_worker(int argc, const char **argv)
+{
+    (void)argc; (void)argv;
+    OSWaitEvent(&s_event);
+    s_eventSeen++;
+    return 0;
+}
+
+static void test_event_manual()
+{
+    OSInitEvent(&s_event, 0, OS_EVENT_MODE_MANUAL);
+    s_eventSeen = 0;
+
+    static OSThread a, b;
+    static uint8_t sa[0x4000], sb[0x4000];
+    OSCreateThread(&a, event_worker, 0, nullptr, sa + sizeof(sa), sizeof(sa),
+                   16, OS_THREAD_ATTRIB_AFFINITY_ANY);
+    OSCreateThread(&b, event_worker, 0, nullptr, sb + sizeof(sb), sizeof(sb),
+                   16, OS_THREAD_ATTRIB_AFFINITY_ANY);
+    OSResumeThread(&a); OSResumeThread(&b);
+
+    svcSleepThread(60000000ULL);
+    check(s_eventSeen == 0, "nessuno passa finche' l'evento non e' segnalato");
+
+    OSSignalEvent(&s_event);      // manuale: liberi entrambi
+    int r = 0;
+    OSJoinThread(&a, &r); OSJoinThread(&b, &r);
+    check(s_eventSeen == 2, "un evento manuale libera tutti i waiter");
+}
+
+static void test_event_timeout()
+{
+    OSInitEvent(&s_event, 0, OS_EVENT_MODE_AUTO);
+    const OSTime hz = OSGetSystemInfo()->busClockSpeed / 4;
+    check(OSWaitEventWithTimeout(&s_event, hz / 20) == 0,
+          "l'attesa con timeout scade su evento non segnalato");
+
+    OSSignalEvent(&s_event);
+    check(OSWaitEventWithTimeout(&s_event, hz / 20) == 1,
+          "l'attesa riesce su evento segnalato");
+}
+
+static void test_message_queue()
+{
+    static OSMessageQueue q;
+    static OSMessage backing[4];
+    OSInitMessageQueue(&q, backing, 4);
+
+    OSMessage m = { (void *)0x1111, { 1, 2, 3 } };
+    check(OSSendMessage(&q, &m, OS_MESSAGE_FLAGS_NONE) == 1, "invio messaggio");
+
+    OSMessage peek = {};
+    check(OSPeekMessage(&q, &peek) == 1 && peek.message == (void *)0x1111,
+          "peek vede senza consumare");
+
+    OSMessage got = {};
+    check(OSReceiveMessage(&q, &got, OS_MESSAGE_FLAGS_NONE) == 1 &&
+          got.message == (void *)0x1111 && got.args[1] == 2,
+          "ricezione restituisce il messaggio intatto");
+
+    check(OSReceiveMessage(&q, &got, OS_MESSAGE_FLAGS_NONE) == 0,
+          "ricezione non bloccante su coda vuota fallisce");
+
+    // Alta priorita': scavalca la coda.
+    OSMessage low = { (void *)0xAAAA, {} };
+    OSMessage high = { (void *)0xBBBB, {} };
+    OSSendMessage(&q, &low, OS_MESSAGE_FLAGS_NONE);
+    OSSendMessage(&q, &high, OS_MESSAGE_FLAGS_HIGH_PRIORITY);
+    OSReceiveMessage(&q, &got, OS_MESSAGE_FLAGS_NONE);
+    check(got.message == (void *)0xBBBB,
+          "un messaggio ad alta priorita' viene ricevuto per primo");
+
+    check(OSGetSystemMessageQueue() != nullptr,
+          "la coda di sistema esiste");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -1186,6 +1267,10 @@ int main(int argc, char **argv)
     test_spinlock();
     test_thread_cancel();
     test_cache_and_block_ops();
+    test_event_manual();
+    test_event_timeout();
+    test_message_queue();
+
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);
