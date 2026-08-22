@@ -5,6 +5,7 @@
 #include <switch.h>
 #include <cstdio>
 #include <cstring>
+#include <errno.h>
 
 namespace {
 
@@ -123,5 +124,19 @@ void OSPanic(const char *file, uint32_t line, const char *fmt, ...)
              file ? file : "?", (unsigned long)line, buf);
     OSFatal(full);
 }
+
+// newlib provides __errno(); the GHS name for the same thing.
+int *__gh_errno_ptr(void)
+{
+    return __errno();
+}
+
+// GHS C++ exception runtime. We do not know what these hooks do, and
+// inventing behaviour would be worse than admitting absence. Null,
+// documented, and left for anyone who can find out.
+void *__cpp_exception_init_ptr    = nullptr;
+void *__cpp_exception_cleanup_ptr = nullptr;
+void *__atexit_cleanup            = nullptr;
+
 
 } // extern "C"

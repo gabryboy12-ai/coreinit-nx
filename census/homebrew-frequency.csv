@@ -19,11 +19,11 @@ coreinit,exit,functions,4,100.0,yes
 proc_ui,ProcUIInitEx,functions,4,100.0,no
 coreinit,DCFlushRange,functions,3,75.0,yes
 coreinit,DCStoreRange,functions,3,75.0,yes
-coreinit,MEMAllocFromDefaultHeap,data,3,75.0,no
-coreinit,MEMAllocFromDefaultHeapEx,data,3,75.0,no
+coreinit,MEMAllocFromDefaultHeap,data,3,75.0,yes
+coreinit,MEMAllocFromDefaultHeapEx,data,3,75.0,yes
 coreinit,MEMCreateExpHeapEx,functions,3,75.0,yes
 coreinit,MEMDestroyExpHeap,functions,3,75.0,yes
-coreinit,MEMFreeToDefaultHeap,data,3,75.0,no
+coreinit,MEMFreeToDefaultHeap,data,3,75.0,yes
 coreinit,MEMFreeToFrmHeap,functions,3,75.0,yes
 coreinit,MEMGetAllocatableSizeForExpHeapEx,functions,3,75.0,yes
 coreinit,MEMGetAllocatableSizeForFrmHeapEx,functions,3,75.0,yes

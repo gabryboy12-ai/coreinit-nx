@@ -13,14 +13,17 @@ namespace coreinit_nx {
 // A useful side effect: this registry is the authoritative list of the
 // library's public surface, more reliable than the hand-maintained
 // implemented.txt.
+enum class ExportKind { Function, Data };
+
 struct ExportedSymbol {
     const char *library;
     const char *name;
     void       *address;
+    ExportKind  kind;
 };
 
-// Returns nullptr if not found.
 void *findExport(const char *library, const char *name);
+void *findExportOfKind(const char *library, const char *name, ExportKind kind);
 
 // True if we implement anything from this library at all.
 bool hasLibrary(const char *library);

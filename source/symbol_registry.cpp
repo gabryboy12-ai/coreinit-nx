@@ -8,6 +8,7 @@
 #include "coreinit/event.h"
 #include "coreinit/filesystem.h"
 #include "coreinit/lockedcache.h"
+#include "coreinit/memdefaultheap.h"
 #include "coreinit/memexpheap.h"
 #include "coreinit/memfrmheap.h"
 #include "coreinit/memheap.h"
@@ -20,80 +21,90 @@
 #include "coreinit/thread.h"
 #include "coreinit/time.h"
 
+
 #include <cstring>
 
 namespace coreinit_nx {
 namespace {
 
-#define EXPORT(lib, fn) { lib, #fn, (void *)(uintptr_t)&fn }
+#define EXPORT_FN(lib, fn)   { lib, #fn, (void *)(uintptr_t)&fn, ExportKind::Function }
+// Per i dati esportiamo l'INDIRIZZO DELLA VARIABILE, non il suo contenuto:
+// il gioco vuole poter leggere e riscrivere il puntatore.
+#define EXPORT_DATA(lib, v)  { lib, #v,  (void *)&v,             ExportKind::Data }
 
 const ExportedSymbol kExports[] = {
     // --- mutex ---
-    EXPORT("coreinit", OSInitMutex),
-    EXPORT("coreinit", OSInitMutexEx),
-    EXPORT("coreinit", OSLockMutex),
-    EXPORT("coreinit", OSUnlockMutex),
-    EXPORT("coreinit", OSTryLockMutex),
+    EXPORT_FN("coreinit", OSInitMutex),
+    EXPORT_FN("coreinit", OSInitMutexEx),
+    EXPORT_FN("coreinit", OSLockMutex),
+    EXPORT_FN("coreinit", OSUnlockMutex),
+    EXPORT_FN("coreinit", OSTryLockMutex),
 
     // --- condition ---
-    EXPORT("coreinit", OSInitCond),
-    EXPORT("coreinit", OSInitCondEx),
-    EXPORT("coreinit", OSWaitCond),
-    EXPORT("coreinit", OSSignalCond),
+    EXPORT_FN("coreinit", OSInitCond),
+    EXPORT_FN("coreinit", OSInitCondEx),
+    EXPORT_FN("coreinit", OSWaitCond),
+    EXPORT_FN("coreinit", OSSignalCond),
 
     // --- time ---
-    EXPORT("coreinit", OSGetTime),
-    EXPORT("coreinit", OSGetSystemTime),
-    EXPORT("coreinit", OSGetTick),
-    EXPORT("coreinit", OSGetSystemTick),
-    EXPORT("coreinit", OSSleepTicks),
-    EXPORT("coreinit", OSCalendarTimeToTicks),
-    EXPORT("coreinit", OSTicksToCalendarTime),
-    EXPORT("coreinit", OSGetSystemInfo),
+    EXPORT_FN("coreinit", OSGetTime),
+    EXPORT_FN("coreinit", OSGetSystemTime),
+    EXPORT_FN("coreinit", OSGetTick),
+    EXPORT_FN("coreinit", OSGetSystemTick),
+    EXPORT_FN("coreinit", OSSleepTicks),
+    EXPORT_FN("coreinit", OSCalendarTimeToTicks),
+    EXPORT_FN("coreinit", OSTicksToCalendarTime),
+    EXPORT_FN("coreinit", OSGetSystemInfo),
 
     // --- heaps ---
-    EXPORT("coreinit", MEMCreateExpHeapEx),
-    EXPORT("coreinit", MEMDestroyExpHeap),
-    EXPORT("coreinit", MEMAllocFromExpHeapEx),
-    EXPORT("coreinit", MEMFreeToExpHeap),
-    EXPORT("coreinit", MEMGetBaseHeapHandle),
-    EXPORT("coreinit", MEMCreateFrmHeapEx),
-    EXPORT("coreinit", MEMAllocFromFrmHeapEx),
-    EXPORT("coreinit", MEMFreeToFrmHeap),
+    EXPORT_FN("coreinit", MEMCreateExpHeapEx),
+    EXPORT_FN("coreinit", MEMDestroyExpHeap),
+    EXPORT_FN("coreinit", MEMAllocFromExpHeapEx),
+    EXPORT_FN("coreinit", MEMFreeToExpHeap),
+    EXPORT_FN("coreinit", MEMGetBaseHeapHandle),
+    EXPORT_FN("coreinit", MEMCreateFrmHeapEx),
+    EXPORT_FN("coreinit", MEMAllocFromFrmHeapEx),
+    EXPORT_FN("coreinit", MEMFreeToFrmHeap),
 
     // --- filesystem ---
-    EXPORT("coreinit", FSInit),
-    EXPORT("coreinit", FSAddClient),
-    EXPORT("coreinit", FSInitCmdBlock),
-    EXPORT("coreinit", FSOpenFile),
-    EXPORT("coreinit", FSReadFile),
-    EXPORT("coreinit", FSCloseFile),
+    EXPORT_FN("coreinit", FSInit),
+    EXPORT_FN("coreinit", FSAddClient),
+    EXPORT_FN("coreinit", FSInitCmdBlock),
+    EXPORT_FN("coreinit", FSOpenFile),
+    EXPORT_FN("coreinit", FSReadFile),
+    EXPORT_FN("coreinit", FSCloseFile),
 
     // --- events, queues, sync ---
-    EXPORT("coreinit", OSInitEvent),
-    EXPORT("coreinit", OSSignalEvent),
-    EXPORT("coreinit", OSWaitEvent),
-    EXPORT("coreinit", OSInitSemaphore),
-    EXPORT("coreinit", OSWaitSemaphore),
-    EXPORT("coreinit", OSSignalSemaphore),
+    EXPORT_FN("coreinit", OSInitEvent),
+    EXPORT_FN("coreinit", OSSignalEvent),
+    EXPORT_FN("coreinit", OSWaitEvent),
+    EXPORT_FN("coreinit", OSInitSemaphore),
+    EXPORT_FN("coreinit", OSWaitSemaphore),
+    EXPORT_FN("coreinit", OSSignalSemaphore),
 
     // --- debug ---
-    EXPORT("coreinit", OSReport),
-    EXPORT("coreinit", OSFatal),
-    EXPORT("coreinit", OSMemoryBarrier),
+    EXPORT_FN("coreinit", OSReport),
+    EXPORT_FN("coreinit", OSFatal),
+    EXPORT_FN("coreinit", OSMemoryBarrier),
+
+        // --- data exports ---
+    EXPORT_DATA("coreinit", MEMAllocFromDefaultHeap),
+    EXPORT_DATA("coreinit", MEMAllocFromDefaultHeapEx),
+    EXPORT_DATA("coreinit", MEMFreeToDefaultHeap),
 };
 
-#undef EXPORT
+#undef EXPORT_FN
 
 constexpr size_t kExportCount = sizeof(kExports) / sizeof(kExports[0]);
 
 } // namespace
 
-void *findExport(const char *library, const char *name)
+void *findExportOfKind(const char *library, const char *name, ExportKind kind)
 {
     if (!library || !name) return nullptr;
     for (size_t i = 0; i < kExportCount; i++) {
-        if (strcmp(kExports[i].library, library) == 0 &&
+        if (kExports[i].kind == kind &&
+            strcmp(kExports[i].library, library) == 0 &&
             strcmp(kExports[i].name, name) == 0) {
             return kExports[i].address;
         }

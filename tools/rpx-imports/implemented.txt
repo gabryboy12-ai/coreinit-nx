@@ -239,3 +239,14 @@ OSDynLoad_Error
 OSDynLoad_GetAllocator
 OSDynLoad_GetNumberOfRPLs
 OSDynLoad_GetRPLInfo
+
+# memdefaultheap.cpp -- data exports
+MEMAllocFromDefaultHeap
+MEMAllocFromDefaultHeapEx
+MEMFreeToDefaultHeap
+
+# ghs runtime
+__gh_errno_ptr
+__cpp_exception_init_ptr
+__cpp_exception_cleanup_ptr
+__atexit_cleanup

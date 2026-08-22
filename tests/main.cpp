@@ -19,6 +19,7 @@
 #include "coreinit/event.h"
 #include "coreinit/messagequeue.h"
 #include "coreinit/dynload.h"
+#include "coreinit/memdefaultheap.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -1253,6 +1254,64 @@ static void test_dynload()
           "GetNumberOfRPLs riporta 0 come su console retail");
 }
 
+static void *s_hookedPtr;
+
+static void *hooked_alloc(uint32_t size)
+{
+    s_hookedPtr = (void *)0xDEADBEEF;
+    (void)size;
+    return s_hookedPtr;
+}
+
+static void test_default_heap_pointers()
+{
+    check(MEMAllocFromDefaultHeap != nullptr,
+          "il puntatore all'allocatore di default e' inizializzato");
+
+    void *p = MEMAllocFromDefaultHeap(256);
+    check(p != nullptr, "l'allocazione tramite puntatore funziona");
+    if (p) MEMFreeToDefaultHeap(p);
+
+    void *aligned = MEMAllocFromDefaultHeapEx(256, 64);
+    check(aligned && ((uintptr_t)aligned & 63) == 0,
+          "la variante allineata rispetta l'allineamento");
+    if (aligned) MEMFreeToDefaultHeap(aligned);
+
+    // Il punto vero: il gioco puo' SOSTITUIRE il puntatore per
+    // intercettare le allocazioni. Se non fosse una variabile vera,
+    // questo non funzionerebbe.
+    MEMAllocFromDefaultHeapFn original = MEMAllocFromDefaultHeap;
+    MEMAllocFromDefaultHeap = hooked_alloc;
+    s_hookedPtr = nullptr;
+    void *hooked = MEMAllocFromDefaultHeap(16);
+    MEMAllocFromDefaultHeap = original;
+
+    check(hooked == (void *)0xDEADBEEF && s_hookedPtr == hooked,
+          "il gioco puo' sostituire l'allocatore di default");
+}
+
+static void test_dynload_data_export()
+{
+    OSDynLoad_Module mod = nullptr;
+    OSDynLoad_Acquire("coreinit", &mod);
+
+    void *addr = nullptr;
+    check(OSDynLoad_FindExport(mod, OS_DYNLOAD_EXPORT_DATA,
+                               "MEMAllocFromDefaultHeap", &addr)
+          == OS_DYNLOAD_OK &&
+          addr == (void *)&MEMAllocFromDefaultHeap,
+          "FindExport su un dato restituisce l'indirizzo della variabile");
+
+    // Cercare un dato come funzione deve fallire, e viceversa.
+    void *wrong = nullptr;
+    check(OSDynLoad_FindExport(mod, OS_DYNLOAD_EXPORT_FUNC,
+                               "MEMAllocFromDefaultHeap", &wrong)
+          != OS_DYNLOAD_OK,
+          "il tipo di export viene distinto");
+
+    OSDynLoad_Release(mod);
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -1313,7 +1372,8 @@ int main(int argc, char **argv)
     test_event_timeout();
     test_message_queue();
     test_dynload();
-
+    test_default_heap_pointers();
+    test_dynload_data_export();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);

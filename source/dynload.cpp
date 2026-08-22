@@ -101,11 +101,12 @@ OSDynLoad_Error OSDynLoad_FindExport(OSDynLoad_Module module,
     auto *m = asModule(module);
     if (!m) return OS_DYNLOAD_MODULE_NOT_FOUND;
 
-    // The registry does not distinguish functions from data yet: everything
-    // registered is a function. Data exports would need their own table.
-    (void)exportType;
+    
 
-    void *addr = coreinit_nx::findExport(m->name, name);
+    const auto kind = (exportType == OS_DYNLOAD_EXPORT_DATA)
+                      ? coreinit_nx::ExportKind::Data
+                      : coreinit_nx::ExportKind::Function;
+    void *addr = coreinit_nx::findExportOfKind(m->name, name, kind);
     if (!addr) return OS_DYNLOAD_MODULE_NOT_FOUND;
 
     *outAddr = addr;
