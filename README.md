@@ -6,13 +6,13 @@ recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
 
-> **Status: early but usable as a base.** Twenty-two modules, 68 tests
+> **Status: early but usable as a base.** Twenty-four modules, 73 tests
 > passing on real hardware.
 >
 > | Corpus | coreinit symbols | Title requirements covered |
 > |---|---|---|
-> | Black Ops 2 (Wii U) | 124 / 162 | **76.5%** |
-> | Homebrew (4 titles) | 158 / 347 | **56.0%** |
+> | Black Ops 2 (Wii U) | 131 / 162 | **80.9%** |
+> | Homebrew (4 titles) | 161 / 347 | **57.6%** |
 >
 > Coverage is measured, not estimated — see [the import census](#the-import-census).
 
@@ -621,6 +621,35 @@ ever allocated for loading.
 `FindExport` is then *called through the returned pointer* and returns a
 valid result — a wrong address would crash rather than answer.
 
+### Data exports
+
+`MEMAllocFromDefaultHeap`, `MEMAllocFromDefaultHeapEx`,
+`MEMFreeToDefaultHeap`, `__gh_errno_ptr`, `__cpp_exception_init_ptr`,
+`__cpp_exception_cleanup_ptr`, `__atexit_cleanup`
+
+Some coreinit exports are **data, not functions**. The default heap
+allocators are global variables holding function pointers: a game reads the
+variable and calls through it, and may *replace* it to hook allocation — a
+common pattern in commercial engines that track memory usage.
+
+They are therefore exported as real variables, initialised to
+implementations backed by the MEM2 base heap. The symbol registry now
+distinguishes `Function` from `Data`, so `OSDynLoad_FindExport` finally
+honours its `exportType` parameter, which it previously ignored.
+
+**Verified on hardware:** replacing `MEMAllocFromDefaultHeap` with a test
+function redirects subsequent allocations through it. A disguised function
+could not do that.
+
+The Green Hills C++ exception hooks (`__cpp_exception_init_ptr` and
+friends) are null. We do not know what they do, and inventing behaviour
+would be worse than admitting absence — they are there so linking succeeds,
+documented as unimplemented for anyone who can find out.
+
+`__gh_errno_ptr` maps to newlib's `__errno()`. `_iob`, `environ` and
+`__gh_FOPEN_MAX` are **not defined here**: newlib already provides them, and
+they belong in the host-provided section alongside `memcpy` and `exit`.
+
 ---
 
 ## The import census
@@ -696,30 +725,23 @@ imported symbol names is factual metadata, not game content.
 
 ## Not implemented yet
 
-38 symbols remain on Black Ops 2, in small groups rather than blocks:
+31 symbols remain on Black Ops 2:
 
+- [ ] **Green Hills runtime** (9) — `__ghsLock`, `__ghsUnlock`,
+      `__ghs_flock_*`, `__gh_get_errno`, `__gh_set_errno`. The Wii U SDK
+      used the GHS compiler; its runtime locking and file-locking hooks have
+      no host equivalent. Now the largest remaining group.
 - [ ] **`UC*`** (5) — user configuration over IPC
 - [ ] **`MCP_*`** (3) — system configuration over IPC
 - [ ] **`OSDriver_Register` / `OSDriver_Deregister`**
-- [ ] **Green Hills runtime**, imported as **data**:
-      `__cpp_exception_init_ptr`, `__cpp_exception_cleanup_ptr`,
-      `__atexit_cleanup`, `__gh_FOPEN_MAX`, plus `__gh_errno_ptr` as a
-      function. The Wii U SDK used the GHS compiler; no host library
-      provides its runtime.
-- [ ] The three `MEM*DefaultHeap` entries, also **data**
 - [ ] `OSYieldThread`, `PPCSync`, `OSCompareAndSwapAtomicEx64`,
       `OSSetExceptionCallback`, `OSReleaseForeground`,
       `OSEnableHomeButtonMenu`, `ENVGetEnvironmentVariable`
 
-**The data imports are now the largest single obstacle.** Seven of the
-remaining symbols are variables read from coreinit's data segment — function
-pointers, error-number pointers, configuration constants — not functions to
-call. Exporting those requires a mechanism this project does not have yet,
-and it is a different problem from everything solved so far.
-
-On homebrew, `OSScreen` (8 functions at 75%) is the last compact group, and
-below it the `FSA*` family — the low-level filesystem primitives wut's own
-runtime uses internally, absent from Black Ops 2.
+On homebrew, `OSScreen` (8 functions at 75%) is the last compact group —
+and the only graphics code anywhere in this project. Below it, the `FSA*`
+family: the low-level filesystem primitives wut's runtime uses internally,
+absent from Black Ops 2.
 
 ---
 
