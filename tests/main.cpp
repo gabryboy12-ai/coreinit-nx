@@ -12,6 +12,7 @@
 #include "coreinit/filesystem.h"
 #include "coreinit/atomic64.h"
 #include "coreinit/alarm.h"
+#include "coreinit/lockedcache.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -947,6 +948,45 @@ static void test_alarm_shutdown()
           "gli allarmi ripartono dopo uno shutdown");
 }
 
+static void test_locked_cache()
+{
+    check(LCHardwareIsAvailable() == 1, "la locked cache si dichiara disponibile");
+    check(LCGetMaxSize() == 16 * 1024, "LCGetMaxSize riporta i 16 KB dell'Espresso");
+
+    const uint32_t before = LCGetAllocatableSize();
+    void *lc = LCAlloc(1024);
+    check(lc != nullptr, "LCAlloc restituisce memoria");
+    check(((uintptr_t)lc & 63) == 0, "il blocco e' allineato alla linea di cache");
+    check(LCGetAllocatableSize() == before - 1024,
+          "lo spazio allocabile cala della quantita' richiesta");
+
+    // Il percorso reale: DMA dalla RAM alla cache, modifica, DMA indietro.
+    static uint8_t mainRam[1024];
+    for (int i = 0; i < 1024; i++) mainRam[i] = (uint8_t)(i & 0xFF);
+
+    LCEnableDMA();
+    check(LCIsDMAEnabled() == 1, "il DMA risulta abilitato");
+
+    LCLoadDMABlocks(lc, mainRam, 1024);
+    LCWaitDMAQueue(LCGetDMAQueueLength());
+    check(memcmp(lc, mainRam, 1024) == 0,
+          "LCLoadDMABlocks copia dalla RAM alla locked cache");
+
+    ((uint8_t *)lc)[0] = 0xAA;
+    LCStoreDMABlocks(mainRam, lc, 1024);
+    LCWaitDMAQueue(LCGetDMAQueueLength());
+    check(mainRam[0] == 0xAA,
+          "LCStoreDMABlocks riporta le modifiche in RAM");
+
+    // Il budget e' quello vero: 16 KB, non memoria infinita.
+    check(LCAlloc(64 * 1024) == nullptr,
+          "un'allocazione oltre i 16 KB fallisce");
+
+    LCDealloc(lc);
+    check(LCGetAllocatableSize() == before,
+          "LCDealloc restituisce lo spazio");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -998,6 +1038,7 @@ int main(int argc, char **argv)
     test_alarm_periodic();
     test_alarm_time_convention();
     test_alarm_shutdown();
+    test_locked_cache();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);

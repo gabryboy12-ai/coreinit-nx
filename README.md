@@ -455,6 +455,31 @@ This is the project's first explicit teardown. Modules owning resources —
 threads, open handles — must expose one, and the port is responsible for
 calling it. `FSShutdown` already plays the same role.
 
+### `coreinit/lockedcache.h`
+
+`LCAlloc`, `LCDealloc`, `LCGetMaxSize`, `LCGetAllocatableSize`,
+`LCGetUnallocated`, `LCHardwareIsAvailable`, `LCEnableDMA`, `LCDisableDMA`,
+`LCIsDMAEnabled`, `LCLoadDMABlocks`, `LCStoreDMABlocks`, `LCWaitDMAQueue`,
+`LCGetDMAQueueLength`
+
+The Espresso can lock 16 KB of its L1 cache and use it as very low latency
+scratch memory, with a DMA engine moving data to and from main RAM. ARM64
+has no equivalent — L1 cannot be locked from userspace and there is no
+program-controlled DMA.
+
+Real memory is allocated instead, aligned to 64 bytes (the A57 cache line).
+A stub allocating nothing would make games read garbage: they write data
+here and read it back. The latency advantage is lost, but it never existed
+on this hardware.
+
+**The 16 KB budget is enforced.** `LCAlloc` fails beyond it, exactly as the
+Espresso would. Offering unlimited memory would hide a real constraint until
+it surfaced somewhere unfixable.
+
+DMA is synchronous — the copy completes before the call returns, so
+`LCGetDMAQueueLength` is always 0 and `LCWaitDMAQueue` has nothing to wait
+for. An asynchronous queue would add a thread and latency for no benefit.
+
 ---
 
 ## The import census
