@@ -10,8 +10,8 @@ recompiled Wii U code can run natively on Nintendo Switch homebrew.
 >
 > | Corpus | coreinit symbols | Title requirements covered |
 > |---|---|---|
-> | Black Ops 2 (Wii U) | 98 / 162 | **60.5%** |
-> | Homebrew (4 titles) | 124 / 347 | **49.2%** |
+> | Black Ops 2 (Wii U) | 106 / 162 | **65.4%** |
+> | Homebrew (4 titles) | 135 / 347 | **51.5%** |
 >
 > Coverage is measured, not estimated — see [the import census](#the-import-census).
 
@@ -513,6 +513,40 @@ here.
 **Verified on hardware:** a worker blocks on a zero-count semaphore and
 resumes only after `OSSignalSemaphore`; two threads performing 5,000
 guarded increments each end at exactly 10,000.
+
+### Cache operations, block move, thread cancellation
+
+`DCInvalidateRange`, `DCZeroRange`, `DCTouchRange`, `ICInvalidateRange`,
+`OSBlockMove`, `OSBlockSet`, `OSCancelThread`, `OSTestThreadCancel`,
+`OSSetThreadCancelState`, `OSDetachThread`, `OSGetStackPointer`,
+`OSBlockThreadsOnExit`
+
+Cache ranges are **rounded up to 32 bytes**, the Espresso line size, as wut
+documents. A game zeroing one byte expects the whole line zeroed, and may
+rely on it.
+
+`DCTouchRange` is a deliberate no-op. On PowerPC it prefetched lines into
+cache; faking that with dummy reads would waste bandwidth for a hint the
+hardware is free to ignore anyway.
+
+`OSBlockMove` honours its `flush` flag — wut notes the function "makes use
+of the cache to speed up the copy, so a flush is recommended", so games pass
+it expecting the synchronisation. It uses `memmove`, not `memcpy`: the
+regions may overlap.
+
+**Thread cancellation is cooperative, and implemented faithfully.** wut
+documents that a cancelled thread "will be terminated next time
+`OSTestThreadCancel` is called" — there is no asynchronous kill to emulate.
+Which is fortunate: killing a thread mid-flight leaves locks held and memory
+unfreed, and libnx rightly offers no way to do it.
+
+**Verified on hardware:** a worker looping with cancellation points stops
+after `OSCancelThread` instead of running to completion; `DCZeroRange` on a
+single byte clears exactly 32.
+
+`OSGetStackPointer` returns the host stack pointer. The value is not
+comparable to anything on Cafe OS, but games use it for depth estimates and
+logging rather than as a meaningful address.
 
 ---
 
