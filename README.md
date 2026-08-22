@@ -5,13 +5,13 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
-> **Status: early but usable as a base.** Fifteen modules, 51 tests passing
+> **Status: early but usable as a base.** Twenty modules, 61 tests passing
 > on real hardware.
 >
 > | Corpus | coreinit symbols | Title requirements covered |
 > |---|---|---|
-> | Black Ops 2 (Wii U) | 106 / 162 | **65.4%** |
-> | Homebrew (4 titles) | 135 / 347 | **51.5%** |
+> | Black Ops 2 (Wii U) | 118 / 162 | **72.8%** |
+> | Homebrew (4 titles) | 153 / 347 | **55.1%** |
 >
 > Coverage is measured, not estimated — see [the import census](#the-import-census).
 
@@ -548,6 +548,39 @@ single byte clears exactly 32.
 comparable to anything on Cafe OS, but games use it for depth estimates and
 logging rather than as a meaningful address.
 
+### `coreinit/event.h`, `coreinit/messagequeue.h`
+
+`OSInitEvent`, `OSInitEventEx`, `OSSignalEvent`, `OSSignalEventAll`,
+`OSWaitEvent`, `OSWaitEventWithTimeout`, `OSResetEvent`,
+`OSInitMessageQueue`, `OSInitMessageQueueEx`, `OSSendMessage`,
+`OSReceiveMessage`, `OSPeekMessage`, `OSGetSystemMessageQueue` —
+`OSEvent` `0x24`, `OSMessage` `0x10`, `OSMessageQueue` `0x3c`.
+
+Cafe OS events are Win32-style, and wut's documentation links each function
+to its Windows counterpart. Manual-reset events stay signalled until
+`OSResetEvent`; auto-reset events release one waiter and clear themselves.
+
+**The message ring is kept host-side** rather than written into the buffer
+the guest supplies. That buffer lives in guest memory with guest byte order,
+and `OSMessage` holds a pointer plus three words that would need swapping on
+every access. Duplicating a few hundred bytes keeps endianness out of the
+hot path.
+
+`OSGetSystemMessageQueue` returns an empty queue. On Cafe OS the system
+publishes application lifecycle events there; nothing feeds it here, and an
+empty queue lets games proceed rather than blocking on it.
+
+**Verified on hardware:** two threads waiting on a manual-reset event are
+both released by a single `OSSignalEvent` — with auto-reset semantics only
+one would pass; a high-priority message jumps the queue; a non-blocking
+receive on an empty queue fails instead of hanging.
+
+Also added: `OSIsThreadTerminated`, `OSIsDebuggerPresent` and
+`OSIsDebuggerInitialized` (both false — there is no Cafe OS debugger here,
+and games use them only to enable extra logging), `OSPanic` (routed through
+the same handler as `OSFatal`, with file and line prepended), and
+`OSMemoryBarrier` (a full fence, matching PowerPC `sync`).
+
 ---
 
 ## The import census
@@ -623,28 +656,20 @@ imported symbol names is factual metadata, not game content.
 
 ## Not implemented yet
 
-On Black Ops 2 the remaining 100% tier:
+On Black Ops 2, 44 symbols remain. The 100% tier:
 
-- [ ] **`OSDynLoad_*`** (6 functions) — runtime module loading and symbol
-      resolution. Sits awkwardly with static recompilation, which assumes
-      everything is known ahead of time. Needs design discussion, not just
-      implementation.
-- [ ] **Thread lifecycle** — `OSCancelThread`, `OSDetachThread`,
-      `OSBlockThreadsOnExit`
+- [ ] **`OSDynLoad_*`** (6) — runtime module loading. See below.
+- [ ] **`UC*`** (4) — user configuration over IPC
 - [ ] **`MCP_*`** (3) — system configuration over IPC
 - [ ] **`OSDriver_Register` / `OSDriver_Deregister`**
-- [ ] Assorted: `DCInvalidateRange`, `DCZeroRange`, `OSBlockMove`,
-      `ENVGetEnvironmentVariable`, `OSCompareAndSwapAtomicEx64`,
-      `OSGetStackPointer`, `OSGetSystemMessageQueue`,
-      `OSEnableHomeButtonMenu`
-- [ ] The three `MEM*DefaultHeap` entries, imported as **data** — function
-      pointers read from coreinit's data segment, which needs a mechanism
-      this project does not yet have.
+- [ ] `OSYieldThread`, `PPCSync`, `OSCompareAndSwapAtomicEx64`,
+      `OSSetExceptionCallback`, `OSReleaseForeground`,
+      `OSEnableHomeButtonMenu`, `ENVGetEnvironmentVariable`
+- [ ] The three `MEM*DefaultHeap` entries, imported as **data**
 
-On homebrew, only `OSScreen` (8 functions at 75%) and the same
-`MEM*DefaultHeap` trio remain above the 50% line. Below it sits the `FSA*`
-family, the low-level filesystem primitives wut's own runtime uses — absent
-from Black Ops 2, which uses the high-level `FS*` API instead.
+On homebrew: `OSScreen` (8 functions at 75%), the same `MEM*DefaultHeap`
+trio, and below that the `FSA*` family — the low-level filesystem
+primitives wut's runtime uses internally, absent from Black Ops 2.
 
 ---
 
