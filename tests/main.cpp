@@ -11,6 +11,7 @@
 #include "coreinit/internal.h"
 #include "coreinit/filesystem.h"
 #include "coreinit/atomic64.h"
+#include "coreinit/alarm.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -830,6 +831,122 @@ static void test_filesystem_mount()
     remove("/switch/cnx-mount.bin");
 }
 
+static volatile int  s_alarmFired;
+static volatile int  s_periodicCount;
+
+static void alarm_cb(OSAlarm *a, OSContext *ctx)
+{
+    (void)a; (void)ctx;
+    s_alarmFired++;
+}
+
+static void periodic_cb(OSAlarm *a, OSContext *ctx)
+{
+    (void)a; (void)ctx;
+    s_periodicCount++;
+}
+
+static void test_alarm_oneshot()
+{
+    static OSAlarm a;
+    s_alarmFired = 0;
+
+    OSCreateAlarm(&a);
+    OSSetAlarmUserData(&a, (void *)0xABCD);
+    check(OSGetAlarmUserData(&a) == (void *)0xABCD,
+          "user data dell'allarme conservato");
+
+    const OSTime hz = OSGetSystemInfo()->busClockSpeed / 4;
+    OSSetAlarm(&a, hz / 10, alarm_cb);              // fra ~100 ms
+
+    svcSleepThread(50000000ULL);
+    check(s_alarmFired == 0, "l'allarme non scatta prima del tempo");
+
+    svcSleepThread(150000000ULL);
+    check(s_alarmFired == 1, "l'allarme scatta una volta sola");
+}
+
+static void test_alarm_cancel()
+{
+    static OSAlarm a;
+    s_alarmFired = 0;
+
+    const OSTime hz = OSGetSystemInfo()->busClockSpeed / 4;
+    OSCreateAlarm(&a);
+    OSSetAlarm(&a, hz / 5, alarm_cb);               // fra ~200 ms
+    check(OSCancelAlarm(&a) == 1, "OSCancelAlarm riporta che era armato");
+
+    svcSleepThread(300000000ULL);
+    check(s_alarmFired == 0, "un allarme cancellato non scatta");
+}
+
+static void test_alarm_periodic()
+{
+    static OSAlarm a;
+    s_periodicCount = 0;
+
+    const OSTime hz = OSGetSystemInfo()->busClockSpeed / 4;
+    OSCreateAlarm(&a);
+    OSSetAlarmTag(&a, 0x1234);
+    OSSetPeriodicAlarm(&a, hz / 20, hz / 20, periodic_cb);
+
+    svcSleepThread(280000000ULL);      // ~5 intervalli da 50 ms
+    OSCancelAlarms(0x1234);
+    const int seen = s_periodicCount;
+
+    svcSleepThread(150000000ULL);
+    printf("  scatti periodici: %d, dopo il cancel: %d\n",
+           seen, s_periodicCount);
+    check(seen >= 3 && s_periodicCount == seen,
+          "l'allarme periodico si ripete e OSCancelAlarms lo ferma");
+}
+
+static void test_alarm_time_convention()
+{
+    static OSAlarm a;
+    s_alarmFired = 0;
+
+    const OSTime hz = OSGetSystemInfo()->busClockSpeed / 4;
+
+    // hz/10 = ~100 ms come DELTA. Come istante assoluto sarebbe 0.1 secondi
+    // dopo l'epoca del 2000, cioe' gia' passato da vent'anni: interpretato
+    // cosi', l'allarme scatterebbe SUBITO.
+    OSCreateAlarm(&a);
+    OSSetAlarm(&a, hz / 10, alarm_cb);
+
+    svcSleepThread(30000000ULL);       // 30 ms
+    const int early = s_alarmFired;
+
+    svcSleepThread(200000000ULL);      // altri 200 ms
+    const int late = s_alarmFired;
+
+    printf("  dopo 30ms: %d, dopo 230ms: %d\n", early, late);
+
+    // early=1 -> il tempo e' ASSOLUTO (valore gia' scaduto, scatto immediato)
+    // early=0, late=1 -> il tempo e' RELATIVO, come dice la doc di wut
+    check(early == 0 && late == 1,
+          "OSSetAlarm interpreta il tempo come durata relativa");
+
+    OSCancelAlarm(&a);
+}
+
+static void test_alarm_shutdown()
+{
+    // Deve poter essere chiamata e poi ricominciare: un port che riavvia
+    // il sottosistema non deve trovarsi lo scheduler morto.
+    coreinitNxAlarmShutdown();
+
+    static OSAlarm a;
+    s_alarmFired = 0;
+    const OSTime hz = OSGetSystemInfo()->busClockSpeed / 4;
+    OSCreateAlarm(&a);
+    OSSetAlarm(&a, hz / 20, alarm_cb);
+    svcSleepThread(150000000ULL);
+
+    check(s_alarmFired == 1,
+          "gli allarmi ripartono dopo uno shutdown");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -876,6 +993,11 @@ int main(int argc, char **argv)
     test_filesystem_write_and_dirs();
     test_atomic64();
     test_filesystem_mount();
+    test_alarm_oneshot();
+    test_alarm_cancel();
+    test_alarm_periodic();
+    test_alarm_time_convention();
+    test_alarm_shutdown();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);
@@ -885,7 +1007,7 @@ int main(int argc, char **argv)
         if (padGetButtonsDown(&pad) & HidNpadButton_Plus) break;
         consoleUpdate(nullptr);
     }
-
+    coreinitNxAlarmShutdown();
     consoleExit(nullptr);
     return 0;
 }

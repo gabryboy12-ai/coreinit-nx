@@ -141,3 +141,15 @@ FSGetMountSource
 FSMount
 FSGetVolumeState
 FSSetStateChangeNotification
+
+# alarm.cpp
+OSCreateAlarm
+OSCreateAlarmEx
+OSSetAlarm
+OSSetPeriodicAlarm
+OSCancelAlarm
+OSCancelAlarms
+OSSetAlarmTag
+OSSetAlarmUserData
+OSGetAlarmUserData
+OSWaitAlarm

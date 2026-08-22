@@ -27,12 +27,12 @@ coreinit,MEMFreeToDefaultHeap,data,3,75.0,no
 coreinit,MEMFreeToFrmHeap,functions,3,75.0,yes
 coreinit,MEMGetAllocatableSizeForExpHeapEx,functions,3,75.0,yes
 coreinit,MEMGetAllocatableSizeForFrmHeapEx,functions,3,75.0,yes
-coreinit,OSCancelAlarm,functions,3,75.0,no
-coreinit,OSCreateAlarm,functions,3,75.0,no
+coreinit,OSCancelAlarm,functions,3,75.0,yes
+coreinit,OSCreateAlarm,functions,3,75.0,yes
 coreinit,OSCreateThread,functions,3,75.0,yes
 coreinit,OSEnableHomeButtonMenu,functions,3,75.0,no
 coreinit,OSFatal,functions,3,75.0,yes
-coreinit,OSGetAlarmUserData,functions,3,75.0,no
+coreinit,OSGetAlarmUserData,functions,3,75.0,yes
 coreinit,OSGetSystemTime,functions,3,75.0,yes
 coreinit,OSGetThreadAffinity,functions,3,75.0,yes
 coreinit,OSGetThreadPriority,functions,3,75.0,yes
@@ -52,8 +52,8 @@ coreinit,OSScreenGetBufferSizeEx,functions,3,75.0,no
 coreinit,OSScreenInit,functions,3,75.0,no
 coreinit,OSScreenPutFontEx,functions,3,75.0,no
 coreinit,OSScreenSetBufferEx,functions,3,75.0,no
-coreinit,OSSetAlarm,functions,3,75.0,no
-coreinit,OSSetAlarmUserData,functions,3,75.0,no
+coreinit,OSSetAlarm,functions,3,75.0,yes
+coreinit,OSSetAlarmUserData,functions,3,75.0,yes
 coreinit,OSSetThreadAffinity,functions,3,75.0,yes
 coreinit,OSSetThreadDeallocator,functions,3,75.0,yes
 coreinit,OSSetThreadPriority,functions,3,75.0,yes
@@ -359,7 +359,7 @@ coreinit,OSAndAtomic64,functions,1,25.0,yes
 coreinit,OSBlockMove,functions,1,25.0,no
 coreinit,OSBlockSet,functions,1,25.0,no
 coreinit,OSCalendarTimeToTicks,functions,1,25.0,yes
-coreinit,OSCancelAlarms,functions,1,25.0,no
+coreinit,OSCancelAlarms,functions,1,25.0,yes
 coreinit,OSCheckActiveThreads,functions,1,25.0,no
 coreinit,OSCheckThreadStackUsage,functions,1,25.0,no
 coreinit,OSClearThreadStackUsage,functions,1,25.0,no
@@ -368,7 +368,7 @@ coreinit,OSCompareAndSwapAtomic64,functions,1,25.0,yes
 coreinit,OSCompareAndSwapAtomicEx64,functions,1,25.0,no
 coreinit,OSConsoleWrite,functions,1,25.0,yes
 coreinit,OSContinueThread,functions,1,25.0,no
-coreinit,OSCreateAlarmEx,functions,1,25.0,no
+coreinit,OSCreateAlarmEx,functions,1,25.0,yes
 coreinit,OSDynLoad_Acquire,functions,1,25.0,no
 coreinit,OSDynLoad_FindExport,functions,1,25.0,no
 coreinit,OSDynLoad_GetAllocator,functions,1,25.0,no
@@ -419,11 +419,11 @@ coreinit,OSRunThread,functions,1,25.0,no
 coreinit,OSSaveCoroutine,functions,1,25.0,no
 coreinit,OSScreenPutPixelEx,functions,1,25.0,no
 coreinit,OSSendMessage,functions,1,25.0,no
-coreinit,OSSetAlarmTag,functions,1,25.0,no
+coreinit,OSSetAlarmTag,functions,1,25.0,yes
 coreinit,OSSetAtomic64,functions,1,25.0,yes
 coreinit,OSSetExceptionCallback,functions,1,25.0,no
 coreinit,OSSetExceptionCallbackEx,functions,1,25.0,no
-coreinit,OSSetPeriodicAlarm,functions,1,25.0,no
+coreinit,OSSetPeriodicAlarm,functions,1,25.0,yes
 coreinit,OSSetThreadCancelState,functions,1,25.0,no
 coreinit,OSSetThreadRunQuantum,functions,1,25.0,no
 coreinit,OSSetThreadStackUsage,functions,1,25.0,no
@@ -441,7 +441,7 @@ coreinit,OSTryAcquireSpinLock,functions,1,25.0,no
 coreinit,OSTryAcquireSpinLockWithTimeout,functions,1,25.0,no
 coreinit,OSUninterruptibleSpinLock_TryAcquire,functions,1,25.0,no
 coreinit,OSUninterruptibleSpinLock_TryAcquireWithTimeout,functions,1,25.0,no
-coreinit,OSWaitAlarm,functions,1,25.0,no
+coreinit,OSWaitAlarm,functions,1,25.0,yes
 coreinit,OSWaitEvent,functions,1,25.0,no
 coreinit,OSWaitEventWithTimeout,functions,1,25.0,no
 coreinit,OSWaitRendezvous,functions,1,25.0,no

@@ -5,13 +5,13 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
-> **Status: early but usable as a base.** Ten modules, 35 tests passing on
-> real hardware.
+> **Status: early but usable as a base.** Twelve modules, 41 tests passing
+> on real hardware.
 >
 > | Corpus | coreinit symbols | Title requirements covered |
 > |---|---|---|
-> | Black Ops 2 (Wii U) | 66 / 162 | **40.7%** |
-> | Homebrew (4 titles) | 85 / 347 | **37.6%** |
+> | Black Ops 2 (Wii U) | 76 / 162 | **46.9%** |
+> | Homebrew (4 titles) | 99 / 347 | **40.5%** |
 >
 > Coverage is measured, not estimated — see [the import census](#the-import-census).
 
@@ -402,6 +402,59 @@ that is the correct behaviour for this environment, not a pretence.
 `FS_STATUS_NOT_FOUND` by stat-ing the path on failure. Games can branch on
 the difference.
 
+### `coreinit/alarm.h`
+
+`OSCreateAlarm`, `OSCreateAlarmEx`, `OSSetAlarm`, `OSSetPeriodicAlarm`,
+`OSCancelAlarm`, `OSCancelAlarms`, `OSSetAlarmTag`, `OSSetAlarmUserData`,
+`OSGetAlarmUserData`, `OSWaitAlarm` — `OSAlarm` is `0x58` bytes.
+
+**One scheduler thread for all alarms**, not one thread per alarm: a game
+may create dozens, and dozens of sleeping threads waste memory and
+scheduling. It sleeps on a condition variable with a timeout until the
+nearest due alarm, so there is no polling loop, and setting a sooner alarm
+signals it to recompute. The thread starts lazily on the first
+`OSSetAlarm`, so a game that never uses alarms pays nothing.
+
+Callbacks are invoked **without holding the internal lock**. A callback that
+sets another alarm would otherwise deadlock — the classic failure mode for
+this kind of code.
+
+The `OSContext *` passed to callbacks is always `nullptr`: there is no
+PowerPC thread context to hand over, and inventing one would be worse than
+admitting its absence.
+
+**Verified on hardware:** one-shot alarms fire once and not early;
+cancelled alarms never fire; periodic alarms repeat and stop on
+`OSCancelAlarms` by tag.
+
+#### A lesson worth recording
+
+The first version of this module passed every test while being **wrong**.
+Implementation and tests shared the same assumption — that `OSSetAlarm`
+takes an absolute deadline — so they agreed with each other and proved
+nothing. wut documents `OSSetPeriodicAlarm`'s `start` as *"the duration
+until the alarm should first be triggered"*: the time is **relative**.
+
+What caught it was a test designed so it could not pass by coincidence:
+pass a value that only makes sense as a delta and would be long expired as
+an absolute instant. It failed, the assumption was wrong, and the code was
+corrected.
+
+Three assumptions in this repository are still in that state —
+self-consistent but unverified: the Cafe OS epoch, the bus clock constant,
+and which atomics return the old value versus the new. Treat them
+accordingly.
+
+### Teardown
+
+`coreinitNxAlarmShutdown` stops and joins the scheduler thread. Without it
+the process terminates while that thread still sleeps on static state being
+destroyed, and Horizon reports an abnormal exit.
+
+This is the project's first explicit teardown. Modules owning resources —
+threads, open handles — must expose one, and the port is responsible for
+calling it. `FSShutdown` already plays the same role.
+
 ---
 
 ## The import census
@@ -479,27 +532,26 @@ imported symbol names is factual metadata, not game content.
 
 Ordered by measured frequency. On Black Ops 2 the remaining 100% tier is:
 
-- [ ] **`LC*`** — locked cache and DMA (10 functions). The Espresso's locked
-      cache has no ARM64 equivalent; this needs a design decision, not an
-      implementation.
-- [ ] **Mounting** — `FSMount`, `FSGetMountSource`, `FSGetVolumeState`,
-      `FSSetStateChangeNotification`. Removable media has no meaningful
-      equivalent here.
-- [ ] **64-bit atomics** — `OSAddAtomic64`, `OSAndAtomic64` and friends.
-      Straightforward on ARM64.
-- [ ] `MCP_Open`, `MCP_Close`, `MCP_GetSysProdSettings` — system
-      configuration.
+- [ ] **`LC*`** — locked cache and DMA (9 functions). The Espresso can lock
+      part of its L1 cache and use it as fast scratch memory with DMA to
+      main RAM. ARM64 has no equivalent.
+- [x] **Alarms** — `OSCreateAlarm`, `OSSetAlarm`, `OSCancelAlarm`,
+      `OSCancelAlarms`, `OSGetAlarmUserData`, `OSSetAlarmUserData`. Also at
+      75% on homebrew, so this group serves both corpora.
+- [ ] **Thread lifecycle** — `OSCancelThread`, `OSBlockThreadsOnExit`
+- [ ] `MCP_Open`, `MCP_Close`, `MCP_GetSysProdSettings` — system config
 - [ ] `DCInvalidateRange`, `DCZeroRange`, `OSBlockMove`,
-      `ENVGetEnvironmentVariable`
+      `ENVGetEnvironmentVariable`, `OSCompareAndSwapAtomicEx64`
+- [ ] The three `MEM*DefaultHeap` entries, imported as **data** rather than
+      functions — these are function *pointers* read from coreinit's data
+      segment, which needs a mechanism this project does not yet have.
 
-On the homebrew corpus the remaining 75% tier is alarms, semaphores,
-uninterruptible spinlocks, `OSScreen` (8 functions), and the three
-`MEM*DefaultHeap` entries imported as **data** rather than functions —
-which needs a mechanism this project does not yet have.
+On homebrew the remaining 75% tier is alarms, semaphores, uninterruptible
+spinlocks, and `OSScreen` (8 functions).
 
-`OSScreen` is worth a note: it sits at 75% on homebrew and is **absent from
-Black Ops 2**. It is how homebrew draws; games draw through GX2. A useful
-illustration of why the two corpora are reported separately.
+`OSScreen` is worth a note: 75% on homebrew, **absent from Black Ops 2**.
+It is how homebrew draws; games draw through GX2. A concrete illustration of
+why the two corpora are reported separately rather than merged.
 
 ---
 
