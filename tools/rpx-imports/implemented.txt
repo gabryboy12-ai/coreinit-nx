@@ -187,3 +187,21 @@ OSUninterruptibleSpinLock_Acquire
 OSUninterruptibleSpinLock_TryAcquire
 OSUninterruptibleSpinLock_TryAcquireWithTimeout
 OSUninterruptibleSpinLock_Release
+
+# cache.cpp
+DCInvalidateRange
+DCZeroRange
+DCTouchRange
+ICInvalidateRange
+
+# memory.cpp
+OSBlockMove
+OSBlockSet
+
+# thread.cpp -- cancellation
+OSCancelThread
+OSTestThreadCancel
+OSSetThreadCancelState
+OSDetachThread
+OSGetStackPointer
+OSBlockThreadsOnExit

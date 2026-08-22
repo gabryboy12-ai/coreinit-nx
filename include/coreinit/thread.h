@@ -59,6 +59,12 @@ int32_t OSJoinThread(OSThread *thread, int *threadResult);
 void    OSExitThread(int32_t result);
 OSThread *OSGetCurrentThread(void);
 uint32_t  OSGetCoreId(void); // TODO: spostare in coreinit/core.h
+void     OSCancelThread(OSThread *thread);
+void     OSDetachThread(OSThread *thread);
+void     OSTestThreadCancel(void);
+int32_t  OSSetThreadCancelState(int32_t state);
+uint32_t OSGetStackPointer(void);
+void     OSBlockThreadsOnExit(void);
 
 OSThreadCleanupCallbackFn OSSetThreadCleanupCallback(
         OSThread *thread, OSThreadCleanupCallbackFn callback);

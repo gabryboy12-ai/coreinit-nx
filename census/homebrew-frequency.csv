@@ -199,9 +199,9 @@ coreinit,FSSetPosFile,functions,2,50.0,yes
 coreinit,FSTruncateFile,functions,2,50.0,no
 coreinit,FSWriteFile,functions,2,50.0,yes
 coreinit,MEMGetSizeForMBlockExpHeap,functions,2,50.0,no
-coreinit,OSCancelThread,functions,2,50.0,no
+coreinit,OSCancelThread,functions,2,50.0,yes
 coreinit,OSCompareAndSwapAtomicEx,functions,2,50.0,no
-coreinit,OSDetachThread,functions,2,50.0,no
+coreinit,OSDetachThread,functions,2,50.0,yes
 coreinit,OSEffectiveToPhysical,functions,2,50.0,no
 coreinit,OSFastMutex_Init,functions,2,50.0,no
 coreinit,OSFastMutex_Lock,functions,2,50.0,no
@@ -234,10 +234,10 @@ sndcore2,AXInit,functions,2,50.0,no
 sndcore2,AXVoiceBegin,functions,2,50.0,no
 sndcore2,AXVoiceEnd,functions,2,50.0,no
 coreinit,DCFlushRangeNoSync,functions,1,25.0,no
-coreinit,DCInvalidateRange,functions,1,25.0,no
+coreinit,DCInvalidateRange,functions,1,25.0,yes
 coreinit,DCStoreRangeNoSync,functions,1,25.0,no
-coreinit,DCTouchRange,functions,1,25.0,no
-coreinit,DCZeroRange,functions,1,25.0,no
+coreinit,DCTouchRange,functions,1,25.0,yes
+coreinit,DCZeroRange,functions,1,25.0,yes
 coreinit,FSBindMount,functions,1,25.0,no
 coreinit,FSBindUnmount,functions,1,25.0,no
 coreinit,FSChangeDirAsync,functions,1,25.0,no
@@ -273,7 +273,7 @@ coreinit,FSUnmount,functions,1,25.0,no
 coreinit,FSWriteFileAsync,functions,1,25.0,no
 coreinit,FSWriteFileWithPos,functions,1,25.0,no
 coreinit,FSWriteFileWithPosAsync,functions,1,25.0,no
-coreinit,ICInvalidateRange,functions,1,25.0,no
+coreinit,ICInvalidateRange,functions,1,25.0,yes
 coreinit,IOS_Close,functions,1,25.0,no
 coreinit,IOS_Ioctl,functions,1,25.0,no
 coreinit,IOS_IoctlAsync,functions,1,25.0,no
@@ -356,8 +356,8 @@ coreinit,OSAddAtomic,functions,1,25.0,no
 coreinit,OSAddAtomic64,functions,1,25.0,yes
 coreinit,OSAllocFromSystem,functions,1,25.0,no
 coreinit,OSAndAtomic64,functions,1,25.0,yes
-coreinit,OSBlockMove,functions,1,25.0,no
-coreinit,OSBlockSet,functions,1,25.0,no
+coreinit,OSBlockMove,functions,1,25.0,yes
+coreinit,OSBlockSet,functions,1,25.0,yes
 coreinit,OSCalendarTimeToTicks,functions,1,25.0,yes
 coreinit,OSCancelAlarms,functions,1,25.0,yes
 coreinit,OSCheckActiveThreads,functions,1,25.0,no
@@ -386,7 +386,7 @@ coreinit,OSGetAtomic64,functions,1,25.0,yes
 coreinit,OSGetCoreCount,functions,1,25.0,no
 coreinit,OSGetDefaultThread,functions,1,25.0,no
 coreinit,OSGetMainCoreId,functions,1,25.0,no
-coreinit,OSGetStackPointer,functions,1,25.0,no
+coreinit,OSGetStackPointer,functions,1,25.0,yes
 coreinit,OSGetSystemMessageQueue,functions,1,25.0,no
 coreinit,OSGetSystemTick,functions,1,25.0,yes
 coreinit,OSGetThreadName,functions,1,25.0,yes
@@ -424,7 +424,7 @@ coreinit,OSSetAtomic64,functions,1,25.0,yes
 coreinit,OSSetExceptionCallback,functions,1,25.0,no
 coreinit,OSSetExceptionCallbackEx,functions,1,25.0,no
 coreinit,OSSetPeriodicAlarm,functions,1,25.0,yes
-coreinit,OSSetThreadCancelState,functions,1,25.0,no
+coreinit,OSSetThreadCancelState,functions,1,25.0,yes
 coreinit,OSSetThreadRunQuantum,functions,1,25.0,no
 coreinit,OSSetThreadStackUsage,functions,1,25.0,no
 coreinit,OSSignalEvent,functions,1,25.0,no
@@ -436,7 +436,7 @@ coreinit,OSSwapAtomic64,functions,1,25.0,yes
 coreinit,OSSwitchCoroutine,functions,1,25.0,no
 coreinit,OSTestAndClearAtomic64,functions,1,25.0,yes
 coreinit,OSTestAndSetAtomic64,functions,1,25.0,yes
-coreinit,OSTestThreadCancel,functions,1,25.0,no
+coreinit,OSTestThreadCancel,functions,1,25.0,yes
 coreinit,OSTryAcquireSpinLock,functions,1,25.0,yes
 coreinit,OSTryAcquireSpinLockWithTimeout,functions,1,25.0,yes
 coreinit,OSUninterruptibleSpinLock_TryAcquire,functions,1,25.0,yes

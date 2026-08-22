@@ -15,6 +15,7 @@
 #include "coreinit/lockedcache.h"
 #include "coreinit/semaphore.h"
 #include "coreinit/spinlock.h"
+#include "coreinit/memory.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -1066,6 +1067,69 @@ static void test_spinlock()
           "lo spinlock protegge davvero la sezione critica");
 }
 
+static volatile int s_cancelLoops;
+
+static int cancel_worker(int argc, const char **argv)
+{
+    (void)argc; (void)argv;
+    for (int i = 0; i < 1000; i++) {
+        s_cancelLoops++;
+        OSTestThreadCancel();          // punto di cancellazione
+        svcSleepThread(1000000ULL);    // 1 ms
+    }
+    return 0;
+}
+
+static void test_thread_cancel()
+{
+    static OSThread t;
+    static uint8_t stack[0x4000];
+    s_cancelLoops = 0;
+
+    OSCreateThread(&t, cancel_worker, 0, nullptr, stack + sizeof(stack),
+                   sizeof(stack), 16, OS_THREAD_ATTRIB_AFFINITY_ANY);
+    OSResumeThread(&t);
+
+    svcSleepThread(50000000ULL);
+    const int before = s_cancelLoops;
+    OSCancelThread(&t);
+
+    int r = 0;
+    OSJoinThread(&t, &r);
+    printf("  giri prima del cancel: %d, totali: %d\n", before, s_cancelLoops);
+
+    check(before > 0 && s_cancelLoops < 1000,
+          "OSCancelThread ferma il thread al punto di cancellazione");
+}
+
+static void test_cache_and_block_ops()
+{
+    static uint8_t buf[128] __attribute__((aligned(32)));
+    memset(buf, 0xFF, sizeof(buf));
+
+    // wut: la dimensione viene arrotondata al successivo 0x20.
+    DCZeroRange(buf, 1);
+    bool firstLineZero = true;
+    for (int i = 0; i < 32; i++) if (buf[i] != 0) firstLineZero = false;
+    check(firstLineZero && buf[32] == 0xFF,
+          "DCZeroRange arrotonda alla linea di cache da 32 byte");
+
+    uint8_t src[64], dst[64];
+    for (int i = 0; i < 64; i++) src[i] = (uint8_t)i;
+    check(OSBlockMove(dst, src, 64, 1) == dst && memcmp(dst, src, 64) == 0,
+          "OSBlockMove copia e restituisce la destinazione");
+
+    OSBlockSet(dst, 0x5A, 64);
+    bool allSet = true;
+    for (int i = 0; i < 64; i++) if (dst[i] != 0x5A) allSet = false;
+    check(allSet, "OSBlockSet riempie con il valore richiesto");
+
+    DCInvalidateRange(dst, 64);
+    ICInvalidateRange(dst, 64);
+    DCTouchRange(dst, 64);
+    check(dst[0] == 0x5A, "le operazioni di cache non corrompono i dati");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -1120,6 +1184,8 @@ int main(int argc, char **argv)
     test_locked_cache();
     test_semaphore();
     test_spinlock();
+    test_thread_cancel();
+    test_cache_and_block_ops();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);

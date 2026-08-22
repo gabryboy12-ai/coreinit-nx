@@ -31,6 +31,8 @@ struct HostThread {
     uint32_t              cafeAffinity;    // bitfield originale su 3 core
     const char           *name;
     OSThreadDeallocatorFn deallocator;
+    bool cancelRequested;
+    bool cancelEnabled;
 
     void init() {
         guest = nullptr; entry = nullptr; argc = 0; argv = nullptr;
@@ -39,6 +41,7 @@ struct HostThread {
         created = false; started = false; detached = false;
         cafePriority = 16; cafeAffinity = OS_THREAD_ATTRIB_AFFINITY_ANY;
         name = nullptr; deallocator = nullptr;
+        cancelRequested = false; cancelEnabled = true;
     }
 };
 
@@ -276,5 +279,49 @@ OSThreadDeallocatorFn OSSetThreadDeallocator(OSThread *thread,
     h->deallocator = fn;
     return previous;
 }
+
+// La cancellazione su Cafe OS e' COOPERATIVA: wut documenta che il thread
+// "verra' terminato la prossima volta che si chiama OSTestThreadCancel".
+// Nessuna terminazione asincrona da simulare -- e meno male, perche'
+// uccidere un thread a tradimento lascia lock presi e memoria non liberata,
+// e libnx giustamente non lo permette.
+void OSCancelThread(OSThread *thread)
+{
+    if (thread) g_threads.get(thread)->cancelRequested = true;
+}
+
+void OSTestThreadCancel(void)
+{
+    if (!t_current) return;
+    if (t_current->cancelRequested && t_current->cancelEnabled) {
+        threadExit();
+    }
+}
+
+int32_t OSSetThreadCancelState(int32_t state)
+{
+    if (!t_current) return 1;
+    const int32_t previous = t_current->cancelEnabled ? 1 : 0;
+    t_current->cancelEnabled = (state != 0);
+    return previous;
+}
+
+void OSDetachThread(OSThread *thread)
+{
+    if (thread) g_threads.get(thread)->detached = true;
+}
+
+uint32_t OSGetStackPointer(void)
+{
+    // Su PowerPC e' il registro r1. Qui restituiamo lo stack pointer host:
+    // il valore non e' confrontabile con nulla di Cafe OS, ma i giochi lo
+    // usano per stime di profondita' e per il logging, non come indirizzo.
+    void *sp = __builtin_frame_address(0);
+    return (uint32_t)(uintptr_t)sp;
+}
+
+// Su Cafe OS blocca la creazione di nuovi thread durante la chiusura del
+// processo. Qui la terminazione la gestisce Horizon: no-op documentata.
+void OSBlockThreadsOnExit(void) {}
 
 } // extern "C"
