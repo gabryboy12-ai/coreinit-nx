@@ -5,13 +5,14 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
-> **Status: early but usable as a base.** Twenty modules, 61 tests passing
-> on real hardware.
+
+> **Status: early but usable as a base.** Twenty-two modules, 68 tests
+> passing on real hardware.
 >
 > | Corpus | coreinit symbols | Title requirements covered |
 > |---|---|---|
-> | Black Ops 2 (Wii U) | 118 / 162 | **72.8%** |
-> | Homebrew (4 titles) | 153 / 347 | **55.1%** |
+> | Black Ops 2 (Wii U) | 124 / 162 | **76.5%** |
+> | Homebrew (4 titles) | 158 / 347 | **56.0%** |
 >
 > Coverage is measured, not estimated — see [the import census](#the-import-census).
 
@@ -581,6 +582,45 @@ and games use them only to enable extra logging), `OSPanic` (routed through
 the same handler as `OSFatal`, with file and line prepended), and
 `OSMemoryBarrier` (a full fence, matching PowerPC `sync`).
 
+### `coreinit/dynload.h` — dynamic loading without a loader
+
+`OSDynLoad_Acquire`, `OSDynLoad_FindExport`, `OSDynLoad_Release`,
+`OSDynLoad_SetAllocator`, `OSDynLoad_GetAllocator`,
+`OSDynLoad_GetNumberOfRPLs`, `OSDynLoad_GetRPLInfo`
+
+This looked like the hardest problem in the project: resolving symbols by
+name at runtime sits awkwardly with static recompilation, which assumes
+every call target is known ahead of time.
+
+The tension dissolves on inspection. Games do not load arbitrary plugins
+through OSDynLoad — they acquire the **system RPLs**, `coreinit`, `gx2`,
+`nsysnet`, which are exactly what this library implements. Nothing needs
+loading; the code is already linked in. `Acquire` becomes a lookup and
+`FindExport` a table search.
+
+`source/symbol_registry.cpp` holds that table, mapping
+`("coreinit", "OSGetTime")` to the address of our implementation. It doubles
+as the authoritative list of the library's public surface — more reliable
+than the hand-maintained `implemented.txt`. It currently holds a
+representative subset; completing it is mechanical work, well suited to
+outside contributions.
+
+Module names carrying a `.rpl` suffix are accepted. Acquiring a library we
+do not implement returns `OS_DYNLOAD_MODULE_NOT_FOUND` rather than a handle
+that would resolve nothing later — an honest failure beats a broken pointer.
+
+`OSDynLoad_GetNumberOfRPLs` and `OSDynLoad_GetRPLInfo` return 0 and FALSE.
+That is not a stub: wut documents them as *"always returns 0 on release
+versions of CafeOS, requires `OSGetSecurityLevel() > 0`"*. They never worked
+on a retail console, so any game calling them already has a fallback path.
+
+`SetAllocator` stores the callbacks and never calls them, since nothing is
+ever allocated for loading.
+
+**Verified on hardware:** a function resolved by name through
+`FindExport` is then *called through the returned pointer* and returns a
+valid result — a wrong address would crash rather than answer.
+
 ---
 
 ## The import census
@@ -656,20 +696,30 @@ imported symbol names is factual metadata, not game content.
 
 ## Not implemented yet
 
-On Black Ops 2, 44 symbols remain. The 100% tier:
+38 symbols remain on Black Ops 2, in small groups rather than blocks:
 
-- [ ] **`OSDynLoad_*`** (6) — runtime module loading. See below.
-- [ ] **`UC*`** (4) — user configuration over IPC
+- [ ] **`UC*`** (5) — user configuration over IPC
 - [ ] **`MCP_*`** (3) — system configuration over IPC
 - [ ] **`OSDriver_Register` / `OSDriver_Deregister`**
+- [ ] **Green Hills runtime**, imported as **data**:
+      `__cpp_exception_init_ptr`, `__cpp_exception_cleanup_ptr`,
+      `__atexit_cleanup`, `__gh_FOPEN_MAX`, plus `__gh_errno_ptr` as a
+      function. The Wii U SDK used the GHS compiler; no host library
+      provides its runtime.
+- [ ] The three `MEM*DefaultHeap` entries, also **data**
 - [ ] `OSYieldThread`, `PPCSync`, `OSCompareAndSwapAtomicEx64`,
       `OSSetExceptionCallback`, `OSReleaseForeground`,
       `OSEnableHomeButtonMenu`, `ENVGetEnvironmentVariable`
-- [ ] The three `MEM*DefaultHeap` entries, imported as **data**
 
-On homebrew: `OSScreen` (8 functions at 75%), the same `MEM*DefaultHeap`
-trio, and below that the `FSA*` family — the low-level filesystem
-primitives wut's runtime uses internally, absent from Black Ops 2.
+**The data imports are now the largest single obstacle.** Seven of the
+remaining symbols are variables read from coreinit's data segment — function
+pointers, error-number pointers, configuration constants — not functions to
+call. Exporting those requires a mechanism this project does not have yet,
+and it is a different problem from everything solved so far.
+
+On homebrew, `OSScreen` (8 functions at 75%) is the last compact group, and
+below it the `FSA*` family — the low-level filesystem primitives wut's own
+runtime uses internally, absent from Black Ops 2.
 
 ---
 
