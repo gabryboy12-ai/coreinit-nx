@@ -5,13 +5,13 @@ An implementation of the Wii U **Cafe OS `coreinit`** API on top of
 recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
-> **Status: early but usable as a base.** Twelve modules, 41 tests passing
+> **Status: early but usable as a base.** Fifteen modules, 51 tests passing
 > on real hardware.
 >
 > | Corpus | coreinit symbols | Title requirements covered |
 > |---|---|---|
-> | Black Ops 2 (Wii U) | 76 / 162 | **46.9%** |
-> | Homebrew (4 titles) | 99 / 347 | **40.5%** |
+> | Black Ops 2 (Wii U) | 98 / 162 | **60.5%** |
+> | Homebrew (4 titles) | 124 / 347 | **49.2%** |
 >
 > Coverage is measured, not estimated — see [the import census](#the-import-census).
 
@@ -480,6 +480,40 @@ DMA is synchronous — the copy completes before the call returns, so
 `LCGetDMAQueueLength` is always 0 and `LCWaitDMAQueue` has nothing to wait
 for. An asynchronous queue would add a thread and latency for no benefit.
 
+### `coreinit/semaphore.h`, `coreinit/spinlock.h`
+
+`OSInitSemaphore`, `OSInitSemaphoreEx`, `OSGetSemaphoreCount`,
+`OSSignalSemaphore`, `OSWaitSemaphore`, `OSTryWaitSemaphore`,
+`OSInitSpinLock`, `OSAcquireSpinLock`, `OSTryAcquireSpinLock`,
+`OSTryAcquireSpinLockWithTimeout`, `OSReleaseSpinLock`, and the four
+`OSUninterruptibleSpinLock_*` variants — `OSSemaphore` `0x20`,
+`OSSpinLock` `0x10`.
+
+Semaphores are built on mutex + condvar rather than libnx's `Semaphore`,
+because `OSGetSemaphoreCount` must read the count **without** modifying it
+and libnx does not expose the value. Ten extra lines buys the counter in
+plain sight.
+
+Note that `OSSignalSemaphore` and `OSTryWaitSemaphore` return the
+**previous** count, not a boolean. wut documents the latter as "if the value
+is >0 then it means the call was successful".
+
+**Spinlocks are mapped to ordinary mutexes.** On Cafe OS they disable
+interrupts and busy-wait, which suits a system with few cores and
+cooperative scheduling. Under Horizon interrupts cannot be disabled from
+userspace, and busy-waiting would be *worse* than a mutex: the Tegra has
+fewer usable cores than the Wii U, so a spinning thread steals time from the
+very thread holding the lock. On preemptive scheduling, spinning is a
+pessimisation.
+
+The `_Uninterruptible` variants are therefore identical to the plain ones —
+the only difference on Cafe OS was interrupt masking, which does not exist
+here.
+
+**Verified on hardware:** a worker blocks on a zero-count semaphore and
+resumes only after `OSSignalSemaphore`; two threads performing 5,000
+guarded increments each end at exactly 10,000.
+
 ---
 
 ## The import census
@@ -555,28 +589,28 @@ imported symbol names is factual metadata, not game content.
 
 ## Not implemented yet
 
-Ordered by measured frequency. On Black Ops 2 the remaining 100% tier is:
+On Black Ops 2 the remaining 100% tier:
 
-- [ ] **`LC*`** — locked cache and DMA (9 functions). The Espresso can lock
-      part of its L1 cache and use it as fast scratch memory with DMA to
-      main RAM. ARM64 has no equivalent.
-- [x] **Alarms** — `OSCreateAlarm`, `OSSetAlarm`, `OSCancelAlarm`,
-      `OSCancelAlarms`, `OSGetAlarmUserData`, `OSSetAlarmUserData`. Also at
-      75% on homebrew, so this group serves both corpora.
-- [ ] **Thread lifecycle** — `OSCancelThread`, `OSBlockThreadsOnExit`
-- [ ] `MCP_Open`, `MCP_Close`, `MCP_GetSysProdSettings` — system config
-- [ ] `DCInvalidateRange`, `DCZeroRange`, `OSBlockMove`,
-      `ENVGetEnvironmentVariable`, `OSCompareAndSwapAtomicEx64`
-- [ ] The three `MEM*DefaultHeap` entries, imported as **data** rather than
-      functions — these are function *pointers* read from coreinit's data
-      segment, which needs a mechanism this project does not yet have.
+- [ ] **`OSDynLoad_*`** (6 functions) — runtime module loading and symbol
+      resolution. Sits awkwardly with static recompilation, which assumes
+      everything is known ahead of time. Needs design discussion, not just
+      implementation.
+- [ ] **Thread lifecycle** — `OSCancelThread`, `OSDetachThread`,
+      `OSBlockThreadsOnExit`
+- [ ] **`MCP_*`** (3) — system configuration over IPC
+- [ ] **`OSDriver_Register` / `OSDriver_Deregister`**
+- [ ] Assorted: `DCInvalidateRange`, `DCZeroRange`, `OSBlockMove`,
+      `ENVGetEnvironmentVariable`, `OSCompareAndSwapAtomicEx64`,
+      `OSGetStackPointer`, `OSGetSystemMessageQueue`,
+      `OSEnableHomeButtonMenu`
+- [ ] The three `MEM*DefaultHeap` entries, imported as **data** — function
+      pointers read from coreinit's data segment, which needs a mechanism
+      this project does not yet have.
 
-On homebrew the remaining 75% tier is alarms, semaphores, uninterruptible
-spinlocks, and `OSScreen` (8 functions).
-
-`OSScreen` is worth a note: 75% on homebrew, **absent from Black Ops 2**.
-It is how homebrew draws; games draw through GX2. A concrete illustration of
-why the two corpora are reported separately rather than merged.
+On homebrew, only `OSScreen` (8 functions at 75%) and the same
+`MEM*DefaultHeap` trio remain above the 50% line. Below it sits the `FSA*`
+family, the low-level filesystem primitives wut's own runtime uses — absent
+from Black Ops 2, which uses the high-level `FS*` API instead.
 
 ---
 
