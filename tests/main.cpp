@@ -20,10 +20,12 @@
 #include "coreinit/messagequeue.h"
 #include "coreinit/dynload.h"
 #include "coreinit/memdefaultheap.h"
+#include "coreinit/ghs.h"
 
 #include <switch.h>
 #include <cstdio>
 #include <cstring>
+#include <errno.h>
 
 static int g_failures = 0;
 
@@ -1312,6 +1314,46 @@ static void test_dynload_data_export()
     OSDynLoad_Release(mod);
 }
 
+static void test_ghs_locks()
+{
+    __ghsLock();
+    __ghsUnlock();
+    check(true, "il lock globale GHS si acquisisce e rilascia");
+
+    uint32_t a = 0xFFFFFFFF, b = 0xFFFFFFFF;
+    __ghs_flock_create(&a);
+    __ghs_flock_create(&b);
+    printf("  flock assegnati: %lu e %lu\n",
+           (unsigned long)a, (unsigned long)b);
+    check(a < 100 && b < 100 && a != b,
+          "flock_create assegna indici distinti dal pool");
+
+    __ghs_flock_file(a);
+    check(__ghs_ftrylock_file(b) == 0,
+          "trylock su un flock libero riesce con 0");
+    __ghs_funlock_file(b);
+    __ghs_funlock_file(a);
+
+    __ghs_flock_destroy(a);
+    __ghs_flock_destroy(b);
+
+    // Dopo destroy l'indice torna disponibile.
+    uint32_t c = 0xFFFFFFFF;
+    __ghs_flock_create(&c);
+    check(c == b, "un flock distrutto viene riassegnato");
+    __ghs_flock_destroy(c);
+}
+
+static void test_ghs_errno()
+{
+    __gh_set_errno(42);
+    check(__gh_get_errno() == 42 && errno == 42,
+          "errno GHS e errno di sistema sono lo stesso");
+    check(__gh_errno_ptr() == &errno,
+          "__gh_errno_ptr punta all'errno del thread corrente");
+    __gh_set_errno(0);
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -1374,6 +1416,8 @@ int main(int argc, char **argv)
     test_dynload();
     test_default_heap_pointers();
     test_dynload_data_export();
+    test_ghs_locks();
+    test_ghs_errno();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);

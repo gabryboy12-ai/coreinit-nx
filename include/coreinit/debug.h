@@ -16,6 +16,8 @@ void OSFatal(const char *msg);
 int32_t OSIsDebuggerPresent(void);
 int32_t OSIsDebuggerInitialized(void);
 void    OSPanic(const char *file, uint32_t line, const char *fmt, ...);
+int  __gh_get_errno(void);
+void __gh_set_errno(int value);
 
 // --- coreinit-nx extensions, not part of Cafe OS ---
 

@@ -7,6 +7,7 @@
 #include "coreinit/debug.h"
 #include "coreinit/event.h"
 #include "coreinit/filesystem.h"
+#include "coreinit/ghs.h"
 #include "coreinit/lockedcache.h"
 #include "coreinit/memdefaultheap.h"
 #include "coreinit/memexpheap.h"
@@ -20,6 +21,7 @@
 #include "coreinit/systeminfo.h"
 #include "coreinit/thread.h"
 #include "coreinit/time.h"
+
 
 
 #include <cstring>
@@ -86,6 +88,16 @@ const ExportedSymbol kExports[] = {
     EXPORT_FN("coreinit", OSReport),
     EXPORT_FN("coreinit", OSFatal),
     EXPORT_FN("coreinit", OSMemoryBarrier),
+
+        // --- GHS C library runtime ---
+    EXPORT_FN("coreinit", __ghsLock),
+    EXPORT_FN("coreinit", __ghsUnlock),
+    EXPORT_FN("coreinit", __gh_errno_ptr),
+    EXPORT_FN("coreinit", __gh_get_errno),
+    EXPORT_FN("coreinit", __gh_set_errno),
+    EXPORT_FN("coreinit", __ghs_flock_create),
+    EXPORT_FN("coreinit", __ghs_flock_file),
+    EXPORT_FN("coreinit", __ghs_funlock_file),
 
         // --- data exports ---
     EXPORT_DATA("coreinit", MEMAllocFromDefaultHeap),
