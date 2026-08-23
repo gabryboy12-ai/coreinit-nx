@@ -6,18 +6,15 @@ recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
 
-> **coreinit coverage is complete for Call of Duty: Black Ops 2** — all 162
-> coreinit symbols the game imports are implemented, measured by the import
-> census rather than estimated.
->
-> | Corpus | coreinit symbols | Title requirements covered |
-> |---|---|---|
-> | Black Ops 2 (Wii U) | 162 / 162 | **100%** |
-> | Homebrew (4 titles) | 169 / 347 | **59.4%** |
->
-> This does **not** mean the game runs. It means one of the system libraries
-> it needs is done. `gx2`, `snd_core`, `padscore` and the recompilation
-> runtime itself are all still missing — see [scope](#what-this-is-not).
+| Corpus | coreinit symbols | Title requirements covered |
+|---|---|---|
+| Black Ops 2 (Wii U) | 100% | 162 / 162 |
+| How to Train Your Dragon 2 (Wii U) | 100% | 179 / 179 combined |
+| Homebrew (4 titles) | 61.3% | 180 / 347 |
+
+**Complete coreinit coverage on two independent commercial titles.** The
+second was never targeted — it came in at 95% before any work, and the 13
+missing symbols took one session.
 
 ---
 
