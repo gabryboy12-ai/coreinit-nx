@@ -260,3 +260,15 @@ __ghs_flock_file
 __ghs_funlock_file
 __ghs_ftrylock_file
 __gh_set_errno
+
+# userconfig.cpp
+UCOpen
+UCClose
+UCReadSysConfig
+UCWriteSysConfig
+UCDeleteSysConfig
+
+# mcp.cpp
+MCP_Open
+MCP_Close
+MCP_GetSysProdSettings

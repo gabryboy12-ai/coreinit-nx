@@ -21,6 +21,8 @@
 #include "coreinit/dynload.h"
 #include "coreinit/memdefaultheap.h"
 #include "coreinit/ghs.h"
+#include "coreinit/userconfig.h"
+#include "coreinit/mcp.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -1354,6 +1356,55 @@ static void test_ghs_errno()
     __gh_set_errno(0);
 }
 
+static void test_userconfig()
+{
+    UCHandle h = UCOpen();
+    check(h > 0, "UCOpen restituisce un handle valido");
+
+    uint32_t language = 0xFFFFFFFF;
+    UCSysConfig cfg = {};
+    snprintf(cfg.name, sizeof(cfg.name), "%s", "cafe.language");
+    cfg.dataType = UC_DATATYPE_UNSIGNED_INT;
+    cfg.dataSize = sizeof(language);
+    cfg.data     = &language;
+
+    check(UCReadSysConfig(h, 1, &cfg) == UC_ERROR_OK &&
+          cfg.error == UC_ERROR_OK && language <= 11,
+          "la lingua viene letta dalle impostazioni reali della console");
+    printf("  lingua Cafe OS: %lu\n", (unsigned long)language);
+
+    UCSysConfig bad = {};
+    snprintf(bad.name, sizeof(bad.name), "%s", "cafe.chiave.inventata");
+    bad.dataType = UC_DATATYPE_UNSIGNED_INT;
+    bad.dataSize = 4;
+    uint32_t dummy = 0;
+    bad.data = &dummy;
+    UCReadSysConfig(h, 1, &bad);
+    check(bad.error == UC_ERROR_KEY_NOT_FOUND,
+          "una chiave sconosciuta viene segnalata nel suo elemento");
+
+    check(UCWriteSysConfig(h, 1, &cfg) == UC_ERROR_OK,
+          "la scrittura viene accettata senza modificare nulla");
+
+    UCClose(h);
+}
+
+static void test_mcp()
+{
+    MCPError h = MCP_Open();
+    check(h > 0, "MCP_Open restituisce un handle valido");
+
+    MCPSysProdSettings prod;
+    check(MCP_GetSysProdSettings(h, &prod) == 0,
+          "MCP_GetSysProdSettings riesce");
+    printf("  regione=%d ntsc_pal=%s\n",
+           (int)prod.game_region, prod.ntsc_pal);
+    check(prod.game_region != 0 && prod.ntsc_pal[0] != '\0',
+          "regione e standard video sono popolati");
+
+    MCP_Close(h);
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -1418,6 +1469,8 @@ int main(int argc, char **argv)
     test_dynload_data_export();
     test_ghs_locks();
     test_ghs_errno();
+    test_userconfig();
+    test_mcp();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);

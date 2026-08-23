@@ -278,7 +278,7 @@ coreinit,IOS_Close,functions,1,25.0,no
 coreinit,IOS_Ioctl,functions,1,25.0,no
 coreinit,IOS_IoctlAsync,functions,1,25.0,no
 coreinit,IOS_Open,functions,1,25.0,no
-coreinit,MCP_Close,functions,1,25.0,no
+coreinit,MCP_Close,functions,1,25.0,yes
 coreinit,MCP_DeleteTitleAsync,functions,1,25.0,no
 coreinit,MCP_DeviceList,functions,1,25.0,no
 coreinit,MCP_FullDeviceList,functions,1,25.0,no
@@ -289,7 +289,7 @@ coreinit,MCP_InstallSetTargetDevice,functions,1,25.0,no
 coreinit,MCP_InstallSetTargetUsb,functions,1,25.0,no
 coreinit,MCP_InstallTitleAbort,functions,1,25.0,no
 coreinit,MCP_InstallTitleAsync,functions,1,25.0,no
-coreinit,MCP_Open,functions,1,25.0,no
+coreinit,MCP_Open,functions,1,25.0,yes
 coreinit,MEMAddBlockHeapTracking,functions,1,25.0,no
 coreinit,MEMAdjustExpHeap,functions,1,25.0,no
 coreinit,MEMAdjustFrmHeap,functions,1,25.0,yes

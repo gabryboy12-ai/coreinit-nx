@@ -21,6 +21,8 @@
 #include "coreinit/systeminfo.h"
 #include "coreinit/thread.h"
 #include "coreinit/time.h"
+#include "coreinit/mcp.h"
+#include "coreinit/userconfig.h"
 
 
 
@@ -98,6 +100,15 @@ const ExportedSymbol kExports[] = {
     EXPORT_FN("coreinit", __ghs_flock_create),
     EXPORT_FN("coreinit", __ghs_flock_file),
     EXPORT_FN("coreinit", __ghs_funlock_file),
+
+        // --- system configuration ---
+    EXPORT_FN("coreinit", UCOpen),
+    EXPORT_FN("coreinit", UCClose),
+    EXPORT_FN("coreinit", UCReadSysConfig),
+    EXPORT_FN("coreinit", UCWriteSysConfig),
+    EXPORT_FN("coreinit", MCP_Open),
+    EXPORT_FN("coreinit", MCP_Close),
+    EXPORT_FN("coreinit", MCP_GetSysProdSettings),
 
         // --- data exports ---
     EXPORT_DATA("coreinit", MEMAllocFromDefaultHeap),
