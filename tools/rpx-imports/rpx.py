@@ -86,9 +86,16 @@ class Rpx:
                 continue
             n = self.name(sh)
             if n.startswith(".fimport_"):
-                kinds[sh["idx"]] = (n[len(".fimport_"):], "functions")
+                lib, kind = n[len(".fimport_"):], "functions"
             elif n.startswith(".dimport_"):
-                kinds[sh["idx"]] = (n[len(".dimport_"):], "data")
+                lib, kind = n[len(".dimport_"):], "data"
+            else:
+                continue
+            # Titles reference the same library with and without the .rpl
+            # suffix; normalise so they aggregate together.
+            if lib.endswith(".rpl"):
+                lib = lib[:-4]
+            kinds[sh["idx"]] = (lib, kind)
 
         if not kinds:
             return {}
@@ -126,6 +133,8 @@ class Rpx:
             for kind in result[lib]:
                 result[lib][kind] = sorted(set(result[lib][kind]))
         return result
+
+    
 
     def referenced_symbols(self):
         """(symtab_index, symbol_index) pairs named by any relocation.

@@ -65,4 +65,18 @@ void ICInvalidateRange(void *addr, uint32_t size)
     if (addr && size) armICacheInvalidate(addr, roundToCacheLine(size));
 }
 
+// The "NoSync" variants skip the trailing memory barrier. On PowerPC that
+// was a real saving when issuing several flushes in a row. armDCacheFlush
+// does not expose the distinction, so these are identical to their
+// synchronising counterparts -- correct, just not faster.
+void DCFlushRangeNoSync(void *addr, uint32_t size)
+{
+    if (addr && size) armDCacheFlush(addr, roundToCacheLine(size));
+}
+
+void DCStoreRangeNoSync(void *addr, uint32_t size)
+{
+    if (addr && size) armDCacheClean(addr, roundToCacheLine(size));
+}
+
 } // extern "C"

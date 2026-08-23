@@ -161,7 +161,48 @@ FSStatus FSMakeDir(FSClient *client, FSCmdBlock *block, const char *path,
 FSStatus FSRemove(FSClient *client, FSCmdBlock *block, const char *path,
                   FSErrorFlag errorMask);
 FSStatus FSRename(FSClient *client, FSCmdBlock *block, const char *src,
-                  const char *dst, FSErrorFlag errorMask);                      
+                  const char *dst, FSErrorFlag errorMask);     
+
+                  typedef void (*FSAsyncCallback)(FSClient *, FSCmdBlock *, FSStatus, uint32_t);
+
+// Da wut: WUT_CHECK_SIZE(FSAsyncData, 0x0C)
+typedef struct FSAsyncData {
+    FSAsyncCallback callback;
+    void           *param;
+    void           *ioMsgQueue;
+} FSAsyncData;
+
+FSStatus FSOpenFileAsync(FSClient *client, FSCmdBlock *block,
+                         const char *path, const char *mode,
+                         FSFileHandle *outHandle, FSErrorFlag errorMask,
+                         FSAsyncData *asyncData);
+FSStatus FSCloseFileAsync(FSClient *client, FSCmdBlock *block,
+                          FSFileHandle handle, FSErrorFlag errorMask,
+                          FSAsyncData *asyncData);
+FSStatus FSReadFileWithPosAsync(FSClient *client, FSCmdBlock *block,
+                                uint8_t *buffer, uint32_t size,
+                                uint32_t count, uint32_t pos,
+                                FSFileHandle handle, uint32_t unk1,
+                                FSErrorFlag errorMask,
+                                FSAsyncData *asyncData);
+FSStatus FSWriteFileWithPosAsync(FSClient *client, FSCmdBlock *block,
+                                 uint8_t *buffer, uint32_t size,
+                                 uint32_t count, uint32_t pos,
+                                 FSFileHandle handle, uint32_t unk1,
+                                 FSErrorFlag errorMask,
+                                 FSAsyncData *asyncData);
+FSStatus FSGetStatFileAsync(FSClient *client, FSCmdBlock *block,
+                            FSFileHandle handle, FSStat *stat,
+                            FSErrorFlag errorMask, FSAsyncData *asyncData);
+FSStatus FSOpenDirAsync(FSClient *client, FSCmdBlock *block,
+                        const char *path, FSDirectoryHandle *handle,
+                        FSErrorFlag errorMask, FSAsyncData *asyncData);
+FSStatus FSReadDirAsync(FSClient *client, FSCmdBlock *block,
+                        FSDirectoryHandle handle, FSDirectoryEntry *entry,
+                        FSErrorFlag errorMask, FSAsyncData *asyncData);
+FSStatus FSCloseDirAsync(FSClient *client, FSCmdBlock *block,
+                         FSDirectoryHandle handle, FSErrorFlag errorMask,
+                         FSAsyncData *asyncData);
 
 // --- estensione coreinit-nx, non parte di Cafe OS ---
 // Mappa un prefisso di percorso Wii U su uno dell'host. Dove stiano i dati

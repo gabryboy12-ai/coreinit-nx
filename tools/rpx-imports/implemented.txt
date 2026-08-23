@@ -296,3 +296,27 @@ OSDriver_Register
 OSDriver_Deregister
 OSDriver_CopyToSaveArea
 OSDriver_CopyFromSaveArea
+
+# filesystem.cpp -- async variants
+FSOpenFileAsync
+FSCloseFileAsync
+FSReadFileWithPosAsync
+FSWriteFileWithPosAsync
+FSGetStatFileAsync
+FSOpenDirAsync
+FSReadDirAsync
+FSCloseDirAsync
+
+# ghs.cpp -- C++ mutex wrappers
+__ghs_mtx_init
+__ghs_mtx_dst
+__ghs_mtx_lock
+__ghs_mtx_unlock
+
+# cache.cpp
+DCFlushRangeNoSync
+DCStoreRangeNoSync
+
+# memexpheap.cpp
+MEMFindContainHeap
+MEMFindParentHeap

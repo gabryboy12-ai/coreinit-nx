@@ -34,6 +34,8 @@ typedef enum MEMBaseHeapType {
 
 MEMHeapHandle MEMGetBaseHeapHandle(MEMBaseHeapType type);
 MEMHeapHandle MEMSetBaseHeapHandle(MEMBaseHeapType type, MEMHeapHandle heap);
+MEMHeapHeader *MEMFindContainHeap(void *block);
+MEMHeapHandle  MEMFindParentHeap(MEMHeapHandle handle);
 
 #ifdef __cplusplus
 }

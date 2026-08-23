@@ -2,6 +2,7 @@
 #include "coreinit/spinlock.h"
 #include "coreinit/mutex.h"
 #include "coreinit/debug.h"
+#include "coreinit/memdefaultheap.h"
 
 #include <switch.h>
 #include <errno.h>
@@ -127,6 +128,31 @@ int __gh_get_errno(void)
 void __gh_set_errno(int error)
 {
     *__gh_errno_ptr() = error;
+}
+
+// The GHS C++ runtime allocates its mutexes from the default heap and hands
+// back a pointer-to-pointer. Layout follows decaf-emu's coreinit_ghs.cpp.
+void __ghs_mtx_init(void **outMutex)
+{
+    if (!outMutex) return;
+    OSMutex *m = (OSMutex *)MEMAllocFromDefaultHeapEx(sizeof(OSMutex), 8);
+    if (m) OSInitMutex(m);
+    *outMutex = m;
+}
+
+void __ghs_mtx_dst(void **mutex)
+{
+    if (mutex && *mutex) { MEMFreeToDefaultHeap(*mutex); *mutex = nullptr; }
+}
+
+void __ghs_mtx_lock(void **mutex)
+{
+    if (mutex && *mutex) OSLockMutex((OSMutex *)*mutex);
+}
+
+void __ghs_mtx_unlock(void **mutex)
+{
+    if (mutex && *mutex) OSUnlockMutex((OSMutex *)*mutex);
 }
 
 } // extern "C"

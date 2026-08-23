@@ -309,4 +309,33 @@ MEMHeapHandle MEMSetBaseHeapHandle(MEMBaseHeapType type, MEMHeapHandle heap)
     return previous;
 }
 
+// Which heap owns this pointer? With host-side bookkeeping this is a scan
+// over the registered heaps rather than a header lookup.
+//
+// NOT IMPLEMENTED for frame heaps: they have no per-block records to search,
+// so a pointer from a FrmHeap will not be found here.
+MEMHeapHeader *MEMFindContainHeap(void *block)
+{
+    if (!block) return nullptr;
+    // The handle table does not expose iteration, so we can only answer for
+    // the base heaps we created ourselves. A game asking about its own
+    // heaps gets nullptr, which Cafe OS also returns for unknown pointers.
+    for (int i = 0; i < 3; i++) {
+        MEMHeapHandle h = g_baseHeap[i];
+        if (!h) continue;
+        auto *host = live(h);
+        if (!host) continue;
+        const uintptr_t p = (uintptr_t)block;
+        if (p >= host->dataStart && p < host->dataEnd) return h;
+    }
+    return nullptr;
+}
+
+// Heap nesting is not modelled: every heap here is independent.
+MEMHeapHandle MEMFindParentHeap(MEMHeapHandle handle)
+{
+    (void)handle;
+    return nullptr;
+}
+
 } // extern "C"

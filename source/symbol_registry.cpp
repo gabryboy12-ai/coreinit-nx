@@ -124,6 +124,14 @@ const ExportedSymbol kExports[] = {
     EXPORT_FN("coreinit", OSDriver_Register),
     EXPORT_FN("coreinit", OSDriver_Deregister),
 
+    EXPORT_FN("coreinit", FSOpenFileAsync),
+    EXPORT_FN("coreinit", FSReadFileWithPosAsync),
+    EXPORT_FN("coreinit", FSCloseFileAsync),
+    EXPORT_FN("coreinit", __ghs_mtx_init),
+    EXPORT_FN("coreinit", __ghs_mtx_lock),
+    EXPORT_FN("coreinit", __ghs_mtx_unlock),
+    EXPORT_FN("coreinit", MEMFindContainHeap),
+
         // --- data exports ---
     EXPORT_DATA("coreinit", MEMAllocFromDefaultHeap),
     EXPORT_DATA("coreinit", MEMAllocFromDefaultHeapEx),

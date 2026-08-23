@@ -1491,6 +1491,85 @@ static void test_driver()
           "un driver gia' chiuso non si deregistra due volte");
 }
 
+static volatile int s_asyncCallbacks;
+
+static void fs_async_cb(FSClient *c, FSCmdBlock *b, FSStatus s, uint32_t p)
+{
+    (void)c; (void)b; (void)s;
+    s_asyncCallbacks += (int)p;
+}
+
+static void test_filesystem_async()
+{
+    FSInit();
+    coreinitNxClearVolumeMappings();
+    coreinitNxAddVolumeMapping("/vol/save", "/switch");
+
+    static FSClient   client;
+    static FSCmdBlock block;
+    FSAddClient(&client, FS_ERROR_FLAG_ALL);
+    FSInitCmdBlock(&block);
+
+    s_asyncCallbacks = 0;
+    FSAsyncData async = {};
+    async.callback = fs_async_cb;
+    async.param    = (void *)1;
+
+    FSFileHandle h = 0;
+    const FSStatus opened = FSOpenFileAsync(&client, &block,
+                                            "/vol/save/cnx-async.bin", "wb",
+                                            &h, FS_ERROR_FLAG_ALL, &async);
+    check(opened == FS_STATUS_OK && s_asyncCallbacks == 1,
+          "l'apertura asincrona completa e invoca la callback");
+
+    if (opened == FS_STATUS_OK) {
+        FSCloseFileAsync(&client, &block, h, FS_ERROR_FLAG_ALL, &async);
+        check(s_asyncCallbacks == 2, "anche la chiusura richiama la callback");
+    }
+
+    // Senza asyncData non deve esplodere.
+    FSFileHandle h2 = 0;
+    FSOpenFileAsync(&client, &block, "/vol/save/cnx-async.bin", "rb", &h2,
+                    FS_ERROR_FLAG_ALL, nullptr);
+    if (h2) FSCloseFile(&client, &block, h2, FS_ERROR_FLAG_ALL);
+    check(true, "asyncData nullo viene tollerato");
+
+    remove("/switch/cnx-async.bin");
+    FSDelClient(&client, FS_ERROR_FLAG_ALL);
+    FSShutdown();
+}
+
+static void test_ghs_mtx()
+{
+    void *m = nullptr;
+    __ghs_mtx_init(&m);
+    check(m != nullptr, "il mutex C++ GHS viene allocato");
+
+    __ghs_mtx_lock(&m);
+    __ghs_mtx_unlock(&m);
+    __ghs_mtx_lock(&m);
+    __ghs_mtx_lock(&m);          // OSMutex e' ricorsivo
+    __ghs_mtx_unlock(&m);
+    __ghs_mtx_unlock(&m);
+    check(true, "lock e unlock, anche annidati, funzionano");
+
+    __ghs_mtx_dst(&m);
+    check(m == nullptr, "la distruzione azzera il puntatore");
+}
+
+static void test_find_contain_heap()
+{
+    MEMHeapHandle base = MEMGetBaseHeapHandle(MEM_BASE_HEAP_MEM2);
+    void *p = MEMAllocFromExpHeapEx(base, 128, 4);
+    check(p && MEMFindContainHeap(p) == base,
+          "MEMFindContainHeap trova l'heap di appartenenza");
+    if (p) MEMFreeToExpHeap(base, p);
+
+    int stackVar = 0;
+    check(MEMFindContainHeap(&stackVar) == nullptr,
+          "un puntatore estraneo non appartiene a nessun heap");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -1559,6 +1638,9 @@ int main(int argc, char **argv)
     test_mcp();
     test_misc_functions();
     test_driver();
+    test_filesystem_async();
+    test_ghs_mtx();
+    test_find_contain_heap();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);

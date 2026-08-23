@@ -102,6 +102,24 @@ HostFile *fileFor(FSFileHandle h) {
     return f->used ? f : nullptr;
 }
 
+// Cafe OS runs these on an I/O thread and calls back on completion. We do
+// the work synchronously and invoke the callback before returning -- the
+// same approach decaf-emu takes for locked cache DMA.
+//
+// A game that polls for completion will always find the operation already
+// done, which is a valid outcome. One that blocks on a message queue we
+// never post to would hang, so if that turns up, this needs revisiting.
+FSStatus completeAsync(FSClient *client, FSCmdBlock *block,
+                       FSStatus result, FSAsyncData *asyncData)
+{
+    if (asyncData && asyncData->callback) {
+        asyncData->callback(client, block, result,
+                            (uint32_t)(uintptr_t)asyncData->param);
+    }
+    return result;
+}
+
+
 } // namespace
 
 extern "C" {
@@ -480,6 +498,88 @@ FSVolumeState FSGetVolumeState(FSClient *client)
 void FSSetStateChangeNotification(FSClient *client, FSStateChangeParams *info)
 {
     (void)client; (void)info;
+}
+
+FSStatus FSOpenFileAsync(FSClient *client, FSCmdBlock *block,
+                         const char *path, const char *mode,
+                         FSFileHandle *outHandle, FSErrorFlag errorMask,
+                         FSAsyncData *asyncData)
+{
+    return completeAsync(client, block,
+        FSOpenFile(client, block, path, mode, outHandle, errorMask),
+        asyncData);
+}
+
+FSStatus FSCloseFileAsync(FSClient *client, FSCmdBlock *block,
+                          FSFileHandle handle, FSErrorFlag errorMask,
+                          FSAsyncData *asyncData)
+{
+    return completeAsync(client, block,
+        FSCloseFile(client, block, handle, errorMask), asyncData);
+}
+
+FSStatus FSReadFileWithPosAsync(FSClient *client, FSCmdBlock *block,
+                                uint8_t *buffer, uint32_t size,
+                                uint32_t count, uint32_t pos,
+                                FSFileHandle handle, uint32_t unk1,
+                                FSErrorFlag errorMask,
+                                FSAsyncData *asyncData)
+{
+    return completeAsync(client, block,
+        FSReadFileWithPos(client, block, buffer, size, count, pos, handle,
+                          unk1, errorMask),
+        asyncData);
+}
+
+FSStatus FSWriteFileWithPosAsync(FSClient *client, FSCmdBlock *block,
+                                 uint8_t *buffer, uint32_t size,
+                                 uint32_t count, uint32_t pos,
+                                 FSFileHandle handle, uint32_t unk1,
+                                 FSErrorFlag errorMask,
+                                 FSAsyncData *asyncData)
+{
+    HostFile *f = fileFor(handle);
+    if (!f) return completeAsync(client, block, FS_STATUS_FATAL_ERROR,
+                                 asyncData);
+    if (fseek(f->fp, (long)pos, SEEK_SET) != 0) {
+        return completeAsync(client, block, FS_STATUS_FATAL_ERROR, asyncData);
+    }
+    return completeAsync(client, block,
+        FSWriteFile(client, block, buffer, size, count, handle, unk1,
+                    errorMask),
+        asyncData);
+}
+
+FSStatus FSGetStatFileAsync(FSClient *client, FSCmdBlock *block,
+                            FSFileHandle handle, FSStat *stat,
+                            FSErrorFlag errorMask, FSAsyncData *asyncData)
+{
+    return completeAsync(client, block,
+        FSGetStatFile(client, block, handle, stat, errorMask), asyncData);
+}
+
+FSStatus FSOpenDirAsync(FSClient *client, FSCmdBlock *block,
+                        const char *path, FSDirectoryHandle *handle,
+                        FSErrorFlag errorMask, FSAsyncData *asyncData)
+{
+    return completeAsync(client, block,
+        FSOpenDir(client, block, path, handle, errorMask), asyncData);
+}
+
+FSStatus FSReadDirAsync(FSClient *client, FSCmdBlock *block,
+                        FSDirectoryHandle handle, FSDirectoryEntry *entry,
+                        FSErrorFlag errorMask, FSAsyncData *asyncData)
+{
+    return completeAsync(client, block,
+        FSReadDir(client, block, handle, entry, errorMask), asyncData);
+}
+
+FSStatus FSCloseDirAsync(FSClient *client, FSCmdBlock *block,
+                         FSDirectoryHandle handle, FSErrorFlag errorMask,
+                         FSAsyncData *asyncData)
+{
+    return completeAsync(client, block,
+        FSCloseDir(client, block, handle, errorMask), asyncData);
 }
 
 } // extern "C"
