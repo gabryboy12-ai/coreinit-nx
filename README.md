@@ -650,6 +650,36 @@ documented as unimplemented for anyone who can find out.
 `__gh_FOPEN_MAX` are **not defined here**: newlib already provides them, and
 they belong in the host-provided section alongside `memcpy` and `exit`.
 
+### `coreinit/ghs.h` — Green Hills C library runtime
+
+`__ghsLock`, `__ghsUnlock`, `__ghs_flock_create`, `__ghs_flock_destroy`,
+`__ghs_flock_file`, `__ghs_funlock_file`, `__ghs_ftrylock_file`,
+`__gh_errno_ptr`, `__gh_get_errno`, `__gh_set_errno`
+
+The Wii U SDK used the Green Hills compiler, and `coreinit` provided its C
+library runtime: the locks that make `FILE*` operations and `errno` access
+thread-safe. wut does not declare these — they are internal GHS names — so
+the reference is decaf-emu's `coreinit_ghs.cpp`.
+
+Reading that source settled three things guesswork would have got wrong:
+
+- **`__ghsLock` uses an uninterruptible spinlock, not a mutex.** Spinlocks
+  are not recursive, which tells us the GHS C library never nests this lock
+  — the obvious worry, `printf` taking it and then `fwrite` taking it again,
+  does not happen.
+- **Flocks are indices into a fixed pool of 100 mutexes**, not pointers.
+- **`__ghs_ftrylock_file` returns 0 on success and 1234 on failure.** An
+  arbitrary value, but the real one.
+
+decaf also excludes `__ghsLock`, `__ghsUnlock` and `__gh_errno_ptr` from its
+HLE trace by default — what you do for functions called thousands of times a
+second. They sit on the hot path of every `printf` and every `errno` access,
+which is why they are implemented with kernel primitives and nothing more.
+
+`__gh_errno_ptr` is per-thread on Cafe OS (decaf returns
+`&thread->context.error`). newlib's `__errno()` is already per-thread, so
+this matches without extra work.
+
 ---
 
 ## The import census

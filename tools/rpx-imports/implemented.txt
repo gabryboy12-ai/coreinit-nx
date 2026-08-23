@@ -250,3 +250,13 @@ __gh_errno_ptr
 __cpp_exception_init_ptr
 __cpp_exception_cleanup_ptr
 __atexit_cleanup
+
+# ghs.cpp -- Green Hills C library runtime
+__ghsLock
+__ghsUnlock
+__ghs_flock_create
+__ghs_flock_destroy
+__ghs_flock_file
+__ghs_funlock_file
+__ghs_ftrylock_file
+__gh_set_errno
