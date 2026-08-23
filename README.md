@@ -6,15 +6,18 @@ recompiled Wii U code can run natively on Nintendo Switch homebrew.
 
 =======
 
-> **Status: early but usable as a base.** Twenty-four modules, 73 tests
-> passing on real hardware.
+> **coreinit coverage is complete for Call of Duty: Black Ops 2** — all 162
+> coreinit symbols the game imports are implemented, measured by the import
+> census rather than estimated.
 >
 > | Corpus | coreinit symbols | Title requirements covered |
 > |---|---|---|
-> | Black Ops 2 (Wii U) | 131 / 162 | **80.9%** |
-> | Homebrew (4 titles) | 161 / 347 | **57.6%** |
+> | Black Ops 2 (Wii U) | 162 / 162 | **100%** |
+> | Homebrew (4 titles) | 169 / 347 | **59.4%** |
 >
-> Coverage is measured, not estimated — see [the import census](#the-import-census).
+> This does **not** mean the game runs. It means one of the system libraries
+> it needs is done. `gx2`, `snd_core`, `padscore` and the recompilation
+> runtime itself are all still missing — see [scope](#what-this-is-not).
 
 ---
 
@@ -32,6 +35,19 @@ Static recompilation tools such as
 [DolRecomp](https://github.com/ExpansionPak/DolRecomp) can translate Wii U
 PowerPC code to C — but they are explicitly CPU-code-only and ship no
 runtime. This project aims to be part of that missing runtime.
+
+---
+
+## What this is not
+
+A port. Black Ops 2 imports 440 symbols from 16 libraries; `coreinit` is 162
+of them. Still absent: `gx2` (102 symbols — a graphics driver, not a
+function list), `snd_core` (42), `padscore` (25), the networking families,
+and the entire static recompilation layer that would turn PowerPC code into
+something Horizon can execute.
+
+What is done is the foundation those all sit on: threads, synchronisation,
+memory, filesystem, timing. Nothing else can be built without it.
 
 ---
 
@@ -787,19 +803,6 @@ imported symbol names is factual metadata, not game content.
 ---
 
 ## Not implemented yet
-
-31 symbols remain on Black Ops 2:
-
-- [ ] **Green Hills runtime** (9) — `__ghsLock`, `__ghsUnlock`,
-      `__ghs_flock_*`, `__gh_get_errno`, `__gh_set_errno`. The Wii U SDK
-      used the GHS compiler; its runtime locking and file-locking hooks have
-      no host equivalent. Now the largest remaining group.
-- [ ] **`UC*`** (5) — user configuration over IPC
-- [ ] **`MCP_*`** (3) — system configuration over IPC
-- [ ] **`OSDriver_Register` / `OSDriver_Deregister`**
-- [ ] `OSYieldThread`, `PPCSync`, `OSCompareAndSwapAtomicEx64`,
-      `OSSetExceptionCallback`, `OSReleaseForeground`,
-      `OSEnableHomeButtonMenu`, `ENVGetEnvironmentVariable`
 
 On homebrew, `OSScreen` (8 functions at 75%) is the last compact group —
 and the only graphics code anywhere in this project. Below it, the `FSA*`
