@@ -35,3 +35,6 @@ extern "C" uint64_t OSGetTitleID(void)
     // configurabile, impostato dal port a runtime.
     return 0;
 }
+
+// La dimensione e' vincolo ABI: il gioco alloca questa struttura.
+static_assert(sizeof(OSSystemInfo) == 0x20, "OSSystemInfo must be 0x20 bytes");

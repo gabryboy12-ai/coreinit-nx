@@ -84,6 +84,11 @@ _Exit
 memcpy
 memmove
 memset
+_iob
+_iob_lock
+environ
+__gh_FOPEN_MAX
+__stdio_cleanup
 
 # thread.cpp -- introspection and TLS
 OSGetThreadPriority
@@ -260,6 +265,8 @@ __ghs_flock_file
 __ghs_funlock_file
 __ghs_ftrylock_file
 __gh_set_errno
+__gh_get_errno
+__ghs_flock_ptr
 
 # userconfig.cpp
 UCOpen
@@ -272,3 +279,20 @@ UCDeleteSysConfig
 MCP_Open
 MCP_Close
 MCP_GetSysProdSettings
+
+# misc.cpp
+OSYieldThread
+PPCSync
+OSCompareAndSwapAtomicEx64
+OSReleaseForeground
+OSEnableForegroundExit
+OSEnableHomeButtonMenu
+OSIsHomeButtonMenuEnabled
+OSSetExceptionCallback
+ENVGetEnvironmentVariable
+
+# driver.cpp
+OSDriver_Register
+OSDriver_Deregister
+OSDriver_CopyToSaveArea
+OSDriver_CopyFromSaveArea

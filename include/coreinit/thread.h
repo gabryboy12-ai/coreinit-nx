@@ -66,6 +66,7 @@ int32_t  OSSetThreadCancelState(int32_t state);
 uint32_t OSGetStackPointer(void);
 void     OSBlockThreadsOnExit(void);
 int32_t OSIsThreadTerminated(OSThread *thread);
+void OSYieldThread(void);
 
 OSThreadCleanupCallbackFn OSSetThreadCleanupCallback(
         OSThread *thread, OSThreadCleanupCallbackFn callback);

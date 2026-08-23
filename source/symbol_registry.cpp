@@ -23,6 +23,9 @@
 #include "coreinit/time.h"
 #include "coreinit/mcp.h"
 #include "coreinit/userconfig.h"
+#include "coreinit/exception.h"
+#include "coreinit/foreground.h"
+#include "coreinit/driver.h"
 
 
 
@@ -109,6 +112,17 @@ const ExportedSymbol kExports[] = {
     EXPORT_FN("coreinit", MCP_Open),
     EXPORT_FN("coreinit", MCP_Close),
     EXPORT_FN("coreinit", MCP_GetSysProdSettings),
+
+        // --- misc ---
+    EXPORT_FN("coreinit", OSYieldThread),
+    EXPORT_FN("coreinit", PPCSync),
+    EXPORT_FN("coreinit", OSCompareAndSwapAtomicEx64),
+    EXPORT_FN("coreinit", OSEnableHomeButtonMenu),
+    EXPORT_FN("coreinit", OSSetExceptionCallback),
+    EXPORT_FN("coreinit", ENVGetEnvironmentVariable),
+
+    EXPORT_FN("coreinit", OSDriver_Register),
+    EXPORT_FN("coreinit", OSDriver_Deregister),
 
         // --- data exports ---
     EXPORT_DATA("coreinit", MEMAllocFromDefaultHeap),

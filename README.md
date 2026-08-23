@@ -680,6 +680,39 @@ which is why they are implemented with kernel primitives and nothing more.
 `&thread->context.error`). newlib's `__errno()` is already per-thread, so
 this matches without extra work.
 
+### `coreinit/userconfig.h`, `coreinit/mcp.h` — system configuration
+
+`UCOpen`, `UCClose`, `UCReadSysConfig`, `UCWriteSysConfig`,
+`UCDeleteSysConfig`, `MCP_Open`, `MCP_Close`, `MCP_GetSysProdSettings`
+
+On Cafe OS both families talk to the IOSU coprocessor over IPC. There is no
+IOSU here, so handles are tokens — Cafe OS accepts any non-negative value.
+
+**Where a Cafe OS key has a real equivalent, we read the real thing.**
+Console language and region come from Horizon's `set` service, so a game
+picking text by system language behaves correctly rather than guessing.
+Horizon's language enum is larger than Cafe OS's, so regional variants
+(British English, Canadian French, Latin American Spanish) collapse onto
+their base language — Cafe OS has no separate code for them.
+
+Fields describing Wii U hardware that does not exist here — serial number,
+model, EEPROM version — are filled with plausible synthetic values. Games
+read them for display and region gating, not for anything checkable.
+
+**Writes are accepted and discarded.** A game changing system configuration
+should not fail — an error might send it down a recovery path nobody tested
+— but it has no business altering the Switch's actual settings.
+
+**Unknown keys fail per-entry, not per-call**, and are logged once. That
+matters for discovery: the log tells a port developer which keys a title
+actually asks for, information nobody currently has. The key surface is
+large and only a handful are implemented.
+
+Note that `MCPSysProdSettings::serial_id` is a fixed-width 12-character
+field with **no terminator**, so it is filled with `memcpy` rather than
+`snprintf`. `model_number` may well be the same on real hardware; it is
+written as a terminated string here since games only display it.
+
 ---
 
 ## The import census

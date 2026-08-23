@@ -30,7 +30,7 @@ coreinit,MEMGetAllocatableSizeForFrmHeapEx,functions,3,75.0,yes
 coreinit,OSCancelAlarm,functions,3,75.0,yes
 coreinit,OSCreateAlarm,functions,3,75.0,yes
 coreinit,OSCreateThread,functions,3,75.0,yes
-coreinit,OSEnableHomeButtonMenu,functions,3,75.0,no
+coreinit,OSEnableHomeButtonMenu,functions,3,75.0,yes
 coreinit,OSFatal,functions,3,75.0,yes
 coreinit,OSGetAlarmUserData,functions,3,75.0,yes
 coreinit,OSGetSystemTime,functions,3,75.0,yes
@@ -365,7 +365,7 @@ coreinit,OSCheckThreadStackUsage,functions,1,25.0,no
 coreinit,OSClearThreadStackUsage,functions,1,25.0,no
 coreinit,OSCompareAndSwapAtomic,functions,1,25.0,no
 coreinit,OSCompareAndSwapAtomic64,functions,1,25.0,yes
-coreinit,OSCompareAndSwapAtomicEx64,functions,1,25.0,no
+coreinit,OSCompareAndSwapAtomicEx64,functions,1,25.0,yes
 coreinit,OSConsoleWrite,functions,1,25.0,yes
 coreinit,OSContinueThread,functions,1,25.0,no
 coreinit,OSCreateAlarmEx,functions,1,25.0,yes
@@ -374,7 +374,7 @@ coreinit,OSDynLoad_FindExport,functions,1,25.0,yes
 coreinit,OSDynLoad_GetAllocator,functions,1,25.0,yes
 coreinit,OSDynLoad_Release,functions,1,25.0,yes
 coreinit,OSDynLoad_SetAllocator,functions,1,25.0,yes
-coreinit,OSEnableForegroundExit,functions,1,25.0,no
+coreinit,OSEnableForegroundExit,functions,1,25.0,yes
 coreinit,OSExitThread,functions,1,25.0,yes
 coreinit,OSFastCond_Init,functions,1,25.0,no
 coreinit,OSFastCond_Signal,functions,1,25.0,no
@@ -412,7 +412,7 @@ coreinit,OSOrAtomic64,functions,1,25.0,yes
 coreinit,OSPanic,functions,1,25.0,yes
 coreinit,OSPeekMessage,functions,1,25.0,yes
 coreinit,OSReceiveMessage,functions,1,25.0,yes
-coreinit,OSReleaseForeground,functions,1,25.0,no
+coreinit,OSReleaseForeground,functions,1,25.0,yes
 coreinit,OSReleaseSpinLock,functions,1,25.0,yes
 coreinit,OSResetEvent,functions,1,25.0,yes
 coreinit,OSRunThread,functions,1,25.0,no
@@ -421,7 +421,7 @@ coreinit,OSScreenPutPixelEx,functions,1,25.0,no
 coreinit,OSSendMessage,functions,1,25.0,yes
 coreinit,OSSetAlarmTag,functions,1,25.0,yes
 coreinit,OSSetAtomic64,functions,1,25.0,yes
-coreinit,OSSetExceptionCallback,functions,1,25.0,no
+coreinit,OSSetExceptionCallback,functions,1,25.0,yes
 coreinit,OSSetExceptionCallbackEx,functions,1,25.0,no
 coreinit,OSSetPeriodicAlarm,functions,1,25.0,yes
 coreinit,OSSetThreadCancelState,functions,1,25.0,yes
@@ -448,7 +448,7 @@ coreinit,OSWaitRendezvous,functions,1,25.0,no
 coreinit,OSWaitRendezvousWithTimeout,functions,1,25.0,no
 coreinit,OSWakeupThread,functions,1,25.0,no
 coreinit,OSXorAtomic64,functions,1,25.0,yes
-coreinit,OSYieldThread,functions,1,25.0,no
+coreinit,OSYieldThread,functions,1,25.0,yes
 gx2,GX2BeginDisplayListEx,functions,1,25.0,no
 gx2,GX2CalcColorBufferAuxInfo,functions,1,25.0,no
 gx2,GX2CalcDepthBufferHiZInfo,functions,1,25.0,no

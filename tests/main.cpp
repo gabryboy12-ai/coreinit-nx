@@ -23,6 +23,9 @@
 #include "coreinit/ghs.h"
 #include "coreinit/userconfig.h"
 #include "coreinit/mcp.h"
+#include "coreinit/driver.h"
+#include "coreinit/exception.h"
+#include "coreinit/foreground.h"
 
 #include <switch.h>
 #include <cstdio>
@@ -1405,6 +1408,89 @@ static void test_mcp()
     MCP_Close(h);
 }
 
+static void test_misc_functions()
+{
+    OSYieldThread();
+    PPCSync();
+    check(true, "yield e barriera non esplodono");
+
+    uint64_t v = 100, old = 0;
+    check(OSCompareAndSwapAtomicEx64(&v, 100, 200, &old) == 1 &&
+          v == 200 && old == 100,
+          "CAS esteso riuscito riporta il valore precedente");
+
+    check(OSCompareAndSwapAtomicEx64(&v, 999, 300, &old) == 0 &&
+          v == 200 && old == 200,
+          "CAS esteso fallito riporta il valore trovato");
+
+    const int32_t was = OSEnableHomeButtonMenu(0);
+    check(OSIsHomeButtonMenuEnabled() == 0,
+          "il flag del tasto HOME viene ricordato");
+    OSEnableHomeButtonMenu(was);
+
+    char buf[64] = {};
+    ENVGetEnvironmentVariable("PATH", buf, sizeof(buf));
+    check(ENVGetEnvironmentVariable("NON_ESISTE_XYZ", buf, sizeof(buf)) == 0 &&
+          buf[0] == '\0',
+          "una variabile d'ambiente assente riporta stringa vuota");
+
+    OSReleaseForeground();
+    check(true, "OSReleaseForeground e' una no-op che ritorna");
+}
+
+static volatile int s_driverInitCalls;
+static volatile int s_driverDoneCalls;
+
+static void driver_on_init(OSDriver_UserDriverId id)
+{
+    (void)id;
+    s_driverInitCalls++;
+}
+
+static void driver_on_done(OSDriver_UserDriverId id)
+{
+    (void)id;
+    s_driverDoneCalls++;
+}
+
+static const char *driver_get_name(OSDriver_UserDriverId id)
+{
+    (void)id;
+    return "test-driver";
+}
+
+static void test_driver()
+{
+    s_driverInitCalls = 0;
+    s_driverDoneCalls = 0;
+
+    OSDriverInterface iface = {};
+    iface.getName = driver_get_name;
+    iface.onInit  = driver_on_init;
+    iface.onDone  = driver_on_done;
+
+    int32_t didInit = 0;
+    check(OSDriver_Register(0, 40, &iface, 0x1234, nullptr, nullptr,
+                            &didInit) == 0,
+          "OSDriver_Register accetta un driver");
+    check(s_driverInitCalls == 1,
+          "onInit viene invocata alla registrazione");
+
+    const uint32_t written = 0xCAFEBABE;
+    uint32_t readBack = 0;
+    check(OSDriver_CopyToSaveArea(0x1234, &written, sizeof(written)) == 0 &&
+          OSDriver_CopyFromSaveArea(0x1234, &readBack, sizeof(readBack)) == 0 &&
+          readBack == written,
+          "l'area di salvataggio del driver conserva i dati");
+
+    coreinitNxDriverShutdown();
+    check(s_driverDoneCalls == 1,
+          "onDone viene invocata allo shutdown");
+
+    check(OSDriver_Deregister(0, 0x1234) == -1,
+          "un driver gia' chiuso non si deregistra due volte");
+}
+
 int main(int argc, char **argv)
 {
     consoleInit(nullptr);
@@ -1471,6 +1557,8 @@ int main(int argc, char **argv)
     test_ghs_errno();
     test_userconfig();
     test_mcp();
+    test_misc_functions();
+    test_driver();
 
     printf("\n%d fallimenti. Premi + per uscire.\n", g_failures);
     consoleUpdate(nullptr);
@@ -1480,6 +1568,7 @@ int main(int argc, char **argv)
         if (padGetButtonsDown(&pad) & HidNpadButton_Plus) break;
         consoleUpdate(nullptr);
     }
+    coreinitNxDriverShutdown();
     coreinitNxAlarmShutdown();
     consoleExit(nullptr);
     return 0;

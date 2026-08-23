@@ -16,6 +16,9 @@ uint64_t OSXorAtomic64(volatile uint64_t *ptr, uint64_t value);
 int32_t  OSTestAndClearAtomic64(volatile uint64_t *ptr, uint32_t bit);
 int32_t  OSTestAndSetAtomic64(volatile uint64_t *ptr, uint32_t bit);
 void OSMemoryBarrier(void);
+int32_t OSCompareAndSwapAtomicEx64(volatile uint64_t *ptr, uint64_t compare,
+                                   uint64_t value, uint64_t *outOld);
+void    PPCSync(void);
 
 #ifdef __cplusplus
 }
